@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Salon Logic WMS - Dashboard de Inventario</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "primary-container": "#0a2e1a","on-error-container": "#93000a","surface-variant": "#dde8e2",
+          "surface-tint": "#1a7a42","primary-fixed": "#d4ede0","inverse-on-surface": "#eef5f0",
+          "on-primary-fixed": "#081a0f","surface-container-high": "#dce8e1","on-secondary": "#ffffff",
+          "on-background": "#0b1f13","surface-dim": "#c8d8cf","surface-bright": "#f4faf6",
+          "background": "#eef5f0","secondary-fixed-dim": "#a3c8b3","on-primary-container": "#d4ede0",
+          "on-secondary-fixed": "#0d2619","surface": "#f4faf6","error": "#ba1a1a","on-error": "#ffffff",
+          "inverse-surface": "#1a2e22","primary-fixed-dim": "#6abf8a","primary": "#0f6b35",
+          "outline-variant": "#adc4b5","surface-container-lowest": "#ffffff","on-surface-variant": "#3a5244",
+          "inverse-primary": "#6abf8a","tertiary-container": "#1a4a30","secondary-fixed": "#c8e6d4",
+          "secondary": "#2e7d52","surface-container": "#e2ede6","on-secondary-container": "#2e7d52",
+          "tertiary-fixed": "#c1e0cc","secondary-container": "#c8e6d4","outline": "#6a9478",
+          "on-tertiary": "#ffffff","error-container": "#ffdad6","surface-container-highest": "#d8e8de",
+          "tertiary": "#1a5c38","surface-container-low": "#eaf3ed","on-primary": "#ffffff","on-surface": "#0b1f13"
+        },
+        "fontFamily": {
+          "table-header": ["Hanken Grotesk"],"headline-lg": ["Hanken Grotesk"],"body-md": ["Hanken Grotesk"],
+          "body-lg": ["Hanken Grotesk"],"body-sm": ["Hanken Grotesk"],"label-data": ["JetBrains Mono"],
+          "headline-md": ["Hanken Grotesk"]
+        },
+        "fontSize": {
+          "table-header": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+          "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+          "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+          "label-data": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+        }
+      }
+    }
+  }
+</script>
+<style>
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  body { font-family: 'Hanken Grotesk', sans-serif; }
+  .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: #eaf3ed; border-radius: 10px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #0f6b35; border-radius: 10px; border: 2px solid #eaf3ed; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #1a7a42; }
+  thead th { position: sticky; top: 0; z-index: 10; background-color: #0f6b35; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 1s linear infinite; }
+  .loading-row td { text-align: center; padding: 2rem; color: #6a9478; font-family: 'Hanken Grotesk', sans-serif; }
+  .error-row td { text-align: center; padding: 2rem; color: #ba1a1a; font-family: 'Hanken Grotesk', sans-serif; }
+  /* Performance: compositing hint for scroll containers */
+  tbody tr { }
+  .last-update { font-size: 11px; color: #6a9478; font-family: 'JetBrains Mono', monospace; }
+  .badge-ok { background: #e8f5e9; color: #2e7d32; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+  .badge-warn { background: #fff8e1; color: #f57f17; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+  .badge-error { background: #ffebee; color: #ba1a1a; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+  .auto-dot { width:8px; height:8px; border-radius:50%; background:#4ade80; display:inline-block; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── SIDEBAR OSCURO VERDE EJECUTIVO ── */
+  aside {
+    background: #0a1f12 !important;
+    border-right-color: #1a3a22 !important;
+  }
+  aside h1 { color: #6abf8a !important; }
+  aside p  { color: #5a8a6a !important; }
+  aside nav a {
+    color: #7ac99a !important;
+  }
+  aside nav a:hover {
+    background: #1a3a22 !important;
+    color: #a5f3c0 !important;
+  }
+  aside nav a.nav-active {
+    background: #0f6b35 !important;
+    color: #ffffff !important;
+    border-right-color: #4ade80 !important;
+  }
+  aside nav a .material-symbols-outlined { color: inherit !important; }
+  aside .w-20 { border: 2px solid #1a3a22; border-radius: 12px; }
+
+  /* ── TOPBAR OSCURO VERDE EJECUTIVO ── */
+  header {
+    background: #0d1f14 !important;
+    border-bottom-color: #1a3a22 !important;
+  }
+  header input {
+    background: #162b1c !important;
+    border-color: #2a5a38 !important;
+    color: #d4ede0 !important;
+  }
+  header input::placeholder { color: #4a7a5a !important; }
+  header .material-symbols-outlined { color: #6abf8a !important; }
+  header button:hover .material-symbols-outlined { color: #a5f3c0 !important; }
+  header .font-bold { color: #a5f3c0 !important; }
+  header .border-r { border-color: #1a3a22 !important; }
+
+  /* Cuando la sección activa es saldo o movimiento, la columna de tablas ocupa todo el ancho */
+  body[data-active="saldo"] .tables-col,
+  body[data-active="movimiento"] .tables-col {
+    grid-column: span 12 / span 12;
+  }
+  /* Scroll expandido en saldo/movimiento */
+  body[data-active="saldo"] .saldo-scroll,
+  body[data-active="saldo"] .mov-scroll,
+  body[data-active="movimiento"] .saldo-scroll,
+  body[data-active="movimiento"] .mov-scroll {
+    max-height: calc(100vh - 280px);
+  }
+</style>
+</head>
+<body class="bg-background text-on-background">
+
+<!-- SideNavBar -->
+<aside class="h-screen fixed left-0 top-0 bg-surface border-r border-outline-variant flex flex-col py-8 z-50 w-40">
+  <div class="px-4 mb-8 flex flex-col items-center gap-2">
+    <div class="w-20 h-20 flex items-center justify-center rounded-xl overflow-hidden">
+      <img alt="Logo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4NJMHsdDlCg52Ed-P7Bo9t37SoLculsDk4KdYXQhHemRTogxYJNjhTr76JWZ2w9Uwkw7nSEQ9hVWVm4b20NK7QLxgHJvsKk_Vjm8xdHC7-XkqmeUOTuxi52Kb_W_MqJvRi667SqA33Ex--nVyZ-5xua_PcW9Ps3Ta36tI9rid285R6OtPAquWsrHu5VGmij2ABJ0THXPxPz5XDRMolTUzKQEhqlVPgddeGmCKTWfWFuQq-HfO-7r9H512MSPYThjnYpY">
+    </div>
+    <div class="text-center">
+      <h1 class="font-headline-md text-[18px] text-primary leading-none">Omar Bernales</h1>
+      <p class="font-body-sm text-[10px] text-on-surface-variant opacity-70">Odan89</p>
+    </div>
+  </div>
+  <nav class="flex-1 space-y-1 px-2">
+    <a data-nav="dashboard" onclick="showSection('dashboard')" class="nav-active flex flex-col items-center gap-1 px-2 py-3 transition-colors duration-200 cursor-pointer" href="#">
+      <span class="material-symbols-outlined">dashboard</span>
+      <span class="font-body-sm text-[11px]">Dashboard</span>
+    </a>
+    <a data-nav="saldo" onclick="showSection('saldo')" class="flex flex-col items-center gap-1 px-2 py-3 transition-colors duration-200 cursor-pointer" href="#">
+      <span class="material-symbols-outlined">inventory_2</span><span class="font-body-sm text-[11px]">Saldo</span>
+    </a>
+    <a data-nav="movimiento" onclick="showSection('movimiento')" class="flex flex-col items-center gap-1 px-2 py-3 transition-colors duration-200 cursor-pointer" href="#">
+      <span class="material-symbols-outlined">history</span><span class="font-body-sm text-[11px]">Movimiento</span>
+    </a>
+    <a data-nav="bajas" onclick="showSection('bajas')" class="flex flex-col items-center gap-1 px-2 py-3 transition-colors duration-200 cursor-pointer" href="#">
+      <span class="material-symbols-outlined">trending_down</span><span class="font-body-sm text-[11px]">Reporte de Bajas</span>
+    </a>
+  </nav>
+</aside>
+
+<!-- TopNavBar -->
+<header class="flex justify-between items-center h-16 px-8 bg-surface border-b border-surface-variant fixed top-0 z-40 w-[calc(100%-10rem)] ml-40">
+  <div class="flex items-center gap-4 flex-1">
+    <div class="relative w-full max-w-md">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary">search</span>
+      <input id="global-search" class="w-full bg-surface-container-low rounded-lg pl-10 pr-4 py-2 font-body-md focus:ring-2 focus:ring-primary outline-none transition-all border-primary border-2" placeholder="Filtrar por producto, lote o ubicacion...">
+    </div>
+  </div>
+  <div class="flex items-center gap-6">
+    <div class="flex items-center gap-4 border-r border-outline-variant pr-6">
+      <button onclick="mostrarAlertas()" class="relative text-on-surface-variant hover:text-primary transition-all" title="Alertas de vencimiento">
+        <span class="material-symbols-outlined">notifications</span>
+        <span id="alert-badge" class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full hidden"></span>
+      </button>
+      <button onclick="mostrarInfoApp()" class="text-on-surface-variant hover:text-primary transition-all" title="Información del sistema">
+        <span class="material-symbols-outlined">account_circle</span>
+      </button>
+    </div>
+    <div class="font-headline-md text-headline-md font-bold text-primary">DERMODIS APPSHEET</div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="mt-16 p-8 bg-background min-h-[calc(100vh-64px)] ml-40">
+
+  <!-- Header -->
+  <div data-section="dashboard" class="mb-8 flex justify-between items-end flex-wrap gap-2">
+    <div>
+      <h2 class="font-headline-lg text-headline-lg text-primary mb-1">Resumen de Saldo (Stock)</h2>
+      <p class="font-body-md text-body-md text-on-surface-variant">Estado actual de stock y movimientos logisticos.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="auto-dot"></span>
+      <span class="last-update" id="last-update-global">Iniciando auto-actualizacion cada 5min...</span>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div data-section="dashboard" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant hover:border-primary transition-colors group">
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-primary-container/10 rounded-lg group-hover:bg-primary-container/20 transition-colors">
+          <span class="material-symbols-outlined text-primary">inventory_2</span>
+        </div>
+        <span class="font-bold text-primary uppercase" style="font-size:1.1rem;">STOCK TOTAL</span>
+      </div>
+      <div class="text-center mt-6">
+        <p class="font-headline-lg text-headline-lg font-bold" id="kpi-total">—</p>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant hover:border-primary transition-colors group">
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-primary-container/10 rounded-lg group-hover:bg-primary-container/20 transition-colors">
+          <span class="material-symbols-outlined text-primary">check_circle</span>
+        </div>
+        <span class="font-bold text-primary uppercase" style="font-size:1.1rem;">DISPONIBLE</span>
+      </div>
+      <div class="text-center mt-6">
+        <p class="font-headline-lg text-headline-lg font-bold" id="kpi-disponible">—</p>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant hover:border-error transition-colors group">
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-error-container/20 rounded-lg group-hover:bg-error-container/30 transition-colors">
+          <span class="material-symbols-outlined text-error">warning</span>
+        </div>
+        <span class="font-bold text-error uppercase" style="font-size:1.1rem;">VENCIDOS</span>
+      </div>
+      <div class="text-center mt-6">
+        <p class="font-headline-lg text-headline-lg font-bold" id="kpi-bajas">—</p>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant hover:border-secondary transition-colors group">
+      <div class="flex justify-between items-start mb-4">
+        <div class="p-2 bg-secondary-container/30 rounded-lg group-hover:bg-secondary-container/40 transition-colors">
+          <span class="material-symbols-outlined text-secondary">visibility</span>
+        </div>
+        <span class="font-bold text-secondary uppercase" style="font-size:1.1rem;">ALERTAS</span>
+      </div>
+      <div class="text-center mt-6">
+        <p class="font-headline-lg text-headline-lg font-bold" id="kpi-alertas">—</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid grid-cols-12 gap-8">
+    <div class="tables-col col-span-12 lg:col-span-9 space-y-8">
+
+      <!-- TABLA SALDO -->
+      <div data-section="dashboard saldo" class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
+        <div class="px-6 py-5 border-b border-outline-variant flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h3 class="font-headline-md text-headline-md text-primary">Saldo de Inventario</h3>
+            <span class="last-update" id="last-update-saldo"></span>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="exportCSV('saldo')" class="flex items-center gap-1 px-3 py-1 bg-surface border border-secondary text-secondary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors">
+              <span class="material-symbols-outlined text-[16px]">download</span><span>Exportar</span>
+            </button>
+            <!-- Buscar general -->
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">search</span>
+              <input id="search-saldo" oninput="debouncedFilterSaldo()" onkeydown="if(event.key==='Enter')filterSaldo()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-36" placeholder="Buscar...">
+            </div>
+            <!-- Filtro WHS -->
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-2 text-[14px] text-on-surface-variant">warehouse</span>
+              <input id="filter-whs-saldo" oninput="debouncedFilterSaldo()" onkeydown="if(event.key==='Enter')filterSaldo()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-28" placeholder="WHS...">
+            </div>
+            <!-- Filtro Código -->
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-2 text-[14px] text-on-surface-variant">qr_code</span>
+              <input id="filter-codigo-saldo" oninput="debouncedFilterSaldo()" onkeydown="if(event.key==='Enter')filterSaldo()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-28" placeholder="Cód1, Cód2...">
+            </div>
+            <!-- Filtro Lote -->
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-2 text-[14px] text-on-surface-variant">tag</span>
+              <input id="filter-lote-saldo" oninput="debouncedFilterSaldo()" onkeydown="if(event.key==='Enter')filterSaldo()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-28" placeholder="Lote...">
+            </div>
+            <button onclick="filterSaldo()" class="flex items-center gap-1 px-3 py-1 bg-primary text-white font-bold rounded text-[12px] hover:opacity-90 transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">filter_alt</span> Filtrar
+            </button>
+            <button onclick="clearFilterSaldo()" class="flex items-center gap-1 px-3 py-1 bg-surface border border-outline text-on-surface-variant font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">close</span> Limpiar
+            </button>
+            <button onclick="loadSaldo()" id="btn-saldo" class="flex items-center gap-1 text-primary font-bold text-body-sm hover:underline whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+            </button>
+            <button onclick="descargarPlantillaSaldo()" id="btn-descargar-plantilla" class="flex items-center gap-1 px-3 py-1 bg-surface border border-outline text-on-surface-variant font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">download</span><span>Descargar Plantilla</span>
+            </button>
+            <input type="file" id="input-plantilla-saldo" accept=".xlsx,.xls,.csv" class="hidden" onchange="cargarPlantillaSaldo(event)">
+            <button onclick="document.getElementById('input-plantilla-saldo').click()" id="btn-plantilla-saldo" class="flex items-center gap-1 px-3 py-1 bg-surface border border-primary text-primary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">upload_file</span><span>Cargar Plantilla</span>
+            </button>
+          </div>
+        </div>
+        <div id="saldo-scroll-inner" class="saldo-scroll overflow-y-auto max-h-[400px] custom-scrollbar" style="will-change:transform">
+          <table class="w-full border-collapse border border-outline-variant">
+            <thead>
+              <tr class="bg-primary text-white">
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant w-8"><input type="checkbox" id="chk-all-saldo" onchange="toggleAllCheck('tbody-saldo',this.checked)" class="w-4 h-4 accent-white cursor-pointer"></th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">CODIGO</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">DESCRIPCION</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">WHS</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">UBICACION</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">LOTE BPCS</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">LOTE</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">EXPIRA</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">CANTIDAD</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">ESTADO</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-saldo">
+              <tr class="loading-row"><td colspan="8"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Cargando datos desde Google Sheets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TABLA MOVIMIENTOS -->
+      <div data-section="dashboard movimiento" class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
+        <div class="px-6 py-5 border-b border-outline-variant flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h3 class="font-headline-md text-headline-md text-primary">Movimientos</h3>
+            <span class="last-update" id="last-update-mov"></span>
+          </div>
+          <div class="flex items-center gap-3 flex-wrap justify-end">
+            <div class="flex items-center gap-2">
+              <label class="font-body-sm text-on-surface-variant text-[12px]">Desde:</label>
+              <input id="fecha-desde" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg px-2 py-1 focus:ring-1 focus:ring-primary outline-none" type="date">
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="font-body-sm text-on-surface-variant text-[12px]">Hasta:</label>
+              <input id="fecha-hasta" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg px-2 py-1 focus:ring-1 focus:ring-primary outline-none" type="date">
+            </div>
+            <button onclick="exportCSV('mov')" class="flex items-center gap-1 px-3 py-1 bg-surface border border-secondary text-secondary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors">
+              <span class="material-symbols-outlined text-[16px]">download</span><span>Exportar</span>
+            </button>
+            <button onclick="exportMovTRFMAS()" class="flex items-center gap-1 px-3 py-1 bg-surface border border-primary text-primary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">table_view</span><span>TRFMAS</span>
+            </button>
+            <div class="flex items-center gap-2">
+              <label class="font-body-sm text-on-surface-variant text-[12px]">Estado:</label>
+              <select id="filter-comentario-mov" onchange="filterMov()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg px-2 py-1 focus:ring-1 focus:ring-primary outline-none">
+                <option value="">Todos</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="trasladado">Trasladado</option>
+              </select>
+            </div>
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">search</span>
+              <input id="search-mov" oninput="debouncedFilterMov()" onkeydown="if(event.key==='Enter')filterMov()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-40" placeholder="Buscar...">
+            </div>
+            <button onclick="filterMov()" class="flex items-center gap-1 px-3 py-1 bg-primary text-white font-bold rounded text-[12px] hover:opacity-90 transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">filter_alt</span> Filtrar
+            </button>
+            <button onclick="clearFilterMov()" class="flex items-center gap-1 px-3 py-1 bg-surface border border-outline text-on-surface-variant font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">close</span> Limpiar
+            </button>
+            <button onclick="loadMov()" id="btn-mov" class="flex items-center gap-1 text-primary font-bold text-body-sm hover:underline whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+            </button>
+          </div>
+        </div>
+        <div id="mov-scroll-inner" class="mov-scroll overflow-y-auto max-h-[400px] custom-scrollbar" style="will-change:transform">
+          <table class="w-full border-collapse border border-outline-variant">
+            <thead>
+              <tr class="bg-primary text-white">
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant w-8"><input type="checkbox" id="chk-all-mov" onchange="toggleAllCheck('tbody-mov',this.checked)" class="w-4 h-4 accent-white cursor-pointer"></th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">FECHA / HORA</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">CODIGO</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">LOTE BPCS</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">UBIC. ORIGEN</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">UBIC. DESTINO</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">CANTIDAD</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">USUARIO</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">ESTADO</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-mov">
+              <tr class="loading-row"><td colspan="9"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Cargando datos desde Google Sheets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TABLA ALERTAS -->
+      <div data-section="dashboard saldo" class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
+        <div class="px-6 py-5 border-b border-outline-variant flex justify-between items-center flex-wrap gap-2">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary">notification_important</span>
+            <div>
+              <h3 class="font-headline-md text-headline-md text-primary">Alertas de Vencimiento Criticas</h3>
+              <span class="last-update" id="last-update-alertas"></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 flex-wrap">
+            <button onclick="exportCSV('alertas')" class="flex items-center gap-1 px-3 py-1 bg-surface border border-secondary text-secondary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors">
+              <span class="material-symbols-outlined text-[16px]">download</span><span>Exportar</span>
+            </button>
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">warehouse</span>
+              <input id="filter-whs-alertas" onkeydown="if(event.key==='Enter')filterAlertas()" oninput="debouncedFilterAlertas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-28" placeholder="WHS...">
+            </div>
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">search</span>
+              <input id="search-alertas" onkeydown="if(event.key==='Enter')filterAlertas()" oninput="debouncedFilterAlertas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-40" placeholder="Buscar...">
+            </div>
+            <button onclick="filterAlertas()" class="flex items-center gap-1 px-3 py-1 bg-primary text-white font-bold rounded text-[12px] hover:opacity-90 transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">filter_alt</span> Filtrar
+            </button>
+            <button onclick="clearFilterAlertas()" class="flex items-center gap-1 px-3 py-1 bg-surface border border-outline text-on-surface-variant font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">close</span> Limpiar
+            </button>
+            <button onclick="loadSaldo()" id="btn-alertas" class="flex items-center gap-1 text-primary font-bold text-body-sm hover:underline whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+            </button>
+          </div>
+        </div>
+        <div class="overflow-y-auto max-h-[400px] custom-scrollbar">
+          <table class="w-full border-collapse border border-outline-variant">
+            <thead>
+              <tr class="bg-primary text-white">
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant w-8"><input type="checkbox" id="chk-all-alertas" onchange="toggleAllCheck('tbody-alertas',this.checked)" class="w-4 h-4 accent-white cursor-pointer"></th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">CODIGO</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">DESCRIPCION</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">LOTE</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">WHS</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">UBICACION</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">CANTIDAD</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">FECHA VENCE</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">DIAS REST.</th>
+                <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">ESTADO</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-alertas">
+              <tr class="loading-row"><td colspan="9"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column -->
+    <div data-section="dashboard" class="col-span-12 lg:col-span-3 space-y-8">
+      <div class="bg-surface-container-lowest p-5 rounded-lg border border-outline-variant">
+        <h3 class="font-headline-md text-[18px] text-primary mb-4">Estado de Lotes</h3>
+        <div class="relative w-36 h-36 mx-auto mb-6">
+          <canvas id="donut-chart" width="144" height="144"></canvas>
+          <div class="absolute inset-4 bg-surface-container-lowest rounded-full flex flex-col items-center justify-center pointer-events-none">
+            <span class="font-headline-md text-[20px] font-bold" id="donut-pct">—</span>
+            <span class="font-body-sm text-[10px] text-on-surface-variant">Vigentes</span>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-[13px]">
+            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-primary"></div><span>Vigentes</span></div>
+            <span class="font-label-data" id="legend-vigentes">—</span>
+          </div>
+          <div class="flex items-center justify-between text-[13px]">
+            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full" style="background:#f59e0b"></div><span>Por Vencer</span></div>
+            <span class="font-label-data" id="legend-cercanos">—</span>
+          </div>
+          <div class="flex items-center justify-between text-[13px]">
+            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-error"></div><span>Vencidos</span></div>
+            <span class="font-label-data" id="legend-vencidos">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Consulta Rápida de Lote -->
+      <div class="bg-surface-container-lowest p-5 rounded-lg border border-outline-variant">
+        <h3 class="font-headline-md text-[18px] text-primary mb-4">Consulta Rápida de Lote</h3>
+        <div class="relative flex items-center mb-3">
+          <span class="material-symbols-outlined absolute left-3 text-[16px] text-on-surface-variant">search</span>
+          <input id="lote-query" onkeydown="if(event.key==='Enter')buscarLote()" class="w-full bg-surface-container-low border border-outline text-on-surface font-label-data text-[13px] rounded-lg pl-9 pr-3 py-2 focus:ring-2 focus:ring-primary outline-none" placeholder="Digite Lote BPCS...">
+        </div>
+        <button onclick="buscarLote()" class="w-full flex items-center justify-center gap-1 px-3 py-2 bg-primary text-white font-bold rounded-lg text-[12px] hover:opacity-90 transition-colors mb-3">
+          <span class="material-symbols-outlined text-[16px]">manage_search</span> Buscar
+        </button>
+        <!-- Encabezado info del lote (aparece tras búsqueda) -->
+        <div id="lote-header" class="hidden mb-3 pb-3 border-b border-outline-variant">
+          <p class="font-label-data text-[11px] text-on-surface-variant uppercase tracking-wide mb-1">Producto</p>
+          <p class="font-body-md text-[13px] font-bold text-on-surface leading-tight" id="lote-desc-val">—</p>
+          <div class="flex gap-4 mt-2">
+            <div>
+              <p class="font-table-header text-table-header text-on-surface-variant">LOTE FÍSICO</p>
+              <p class="font-label-data text-[13px] font-bold text-on-surface" id="lote-fisico-val">—</p>
+            </div>
+            <div>
+              <p class="font-table-header text-table-header text-on-surface-variant">EXPIRACIÓN</p>
+              <p class="font-label-data text-[13px] font-bold" id="lote-expira-val">—</p>
+            </div>
+            <div>
+              <p class="font-table-header text-table-header text-on-surface-variant">ESTADO</p>
+              <p id="lote-estado-val" class="mt-0.5">—</p>
+            </div>
+          </div>
+        </div>
+        <!-- Tabla de ubicaciones -->
+        <div id="lote-tabla" class="hidden">
+          <p class="font-table-header text-table-header text-on-surface-variant mb-2">UBICACIONES (<span id="lote-count">0</span>)</p>
+          <div class="overflow-y-auto max-h-48 custom-scrollbar rounded border border-outline-variant">
+            <table class="w-full border-collapse text-[11px]">
+              <thead>
+                <tr class="bg-primary text-white">
+                  <th class="px-2 py-1.5 text-left font-bold tracking-wide">UBIC.</th>
+                  <th class="px-2 py-1.5 text-left font-bold tracking-wide">WHS</th>
+                  <th class="px-2 py-1.5 text-right font-bold tracking-wide">CANT.</th>
+                </tr>
+              </thead>
+              <tbody id="lote-tbody"></tbody>
+            </table>
+          </div>
+          <div class="flex justify-between items-center mt-2 pt-2 border-t border-outline-variant">
+            <span class="font-table-header text-table-header text-on-surface-variant">TOTAL</span>
+            <span class="font-label-data text-[13px] font-bold text-primary" id="lote-total">—</span>
+          </div>
+        </div>
+        <p id="lote-msg" class="text-[12px] text-on-surface-variant mt-1 hidden"></p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECCIÓN REPORTE DE BAJAS -->
+  <div data-section="bajas">
+    <div class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
+      <div class="px-6 py-5 border-b border-outline-variant flex justify-between items-center flex-wrap gap-3">
+        <div>
+          <h3 class="font-headline-md text-headline-md text-primary">Reporte de Bajas</h3>
+          <span class="last-update" id="last-update-bajas"></span>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex items-center gap-2">
+            <label class="font-body-sm text-on-surface-variant text-[12px]">Desde:</label>
+            <input id="bajas-desde" type="date" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg px-2 py-1 focus:ring-1 focus:ring-primary outline-none">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="font-body-sm text-on-surface-variant text-[12px]">Hasta:</label>
+            <input id="bajas-hasta" type="date" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg px-2 py-1 focus:ring-1 focus:ring-primary outline-none">
+          </div>
+          <button onclick="exportCSV('bajas')" class="flex items-center gap-1 px-3 py-1 bg-surface border border-secondary text-secondary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors">
+            <span class="material-symbols-outlined text-[16px]">download</span><span>Exportar</span>
+          </button>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">place</span>
+            <input id="filter-destino-bajas" oninput="debouncedFilterBajas()" onkeydown="if(event.key==='Enter')filterBajas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-32" placeholder="Ubic. Destino...">
+          </div>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">search</span>
+            <input id="search-bajas" oninput="debouncedFilterBajas()" onkeydown="if(event.key==='Enter')filterBajas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-40" placeholder="Buscar...">
+          </div>
+          <button onclick="filterBajas()" class="flex items-center gap-1 px-3 py-1 bg-primary text-white font-bold rounded text-[12px] hover:opacity-90 transition-colors whitespace-nowrap">
+            <span class="material-symbols-outlined text-[16px]">filter_alt</span> Filtrar
+          </button>
+          <button onclick="clearFilterBajas()" class="flex items-center gap-1 px-3 py-1 bg-surface border border-outline text-on-surface-variant font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+            <span class="material-symbols-outlined text-[16px]">close</span> Limpiar
+          </button>
+          <button onclick="loadBajas()" id="btn-bajas" class="flex items-center gap-1 text-primary font-bold text-body-sm hover:underline whitespace-nowrap">
+            <span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar
+          </button>
+        </div>
+      </div>
+      <div id="bajas-scroll-inner" class="overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar" style="will-change:transform">
+        <table class="w-full border-collapse border border-outline-variant">
+          <thead>
+            <tr class="bg-primary text-white">
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant w-8"><input type="checkbox" id="chk-all-bajas" onchange="toggleAllCheck('tbody-bajas',this.checked)" class="w-4 h-4 accent-white cursor-pointer"></th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">FECHA</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">CODIGO</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant">DESCRIPCION</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">EAN13</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">LOTE</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">EXPIRA</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">CANTIDAD</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">BODEGA</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">UBIC. ORIGEN</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">UBIC. DESTINO</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">ESTATUS</th>
+              <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant whitespace-nowrap">USUARIO</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-bajas">
+            <tr class="loading-row"><td colspan="12"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Cargando datos desde Google Sheets...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- FAB -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50">
+  <span class="material-symbols-outlined text-[28px]">barcode_scanner</span>
+</button>
+
+<script>
+// =============================================
+// CONFIGURACION
+// =============================================
+const URL_SALDO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQMDxJZ_QVjWKqD44LIy9q_vvBIElkZQBaMTpQEoEI4L7ak7KORfyoCa4jLIMNFpAMOi7FIX-JVP132/pub?gid=273620597&single=true&output=csv';
+const URL_MOV   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQMDxJZ_QVjWKqD44LIy9q_vvBIElkZQBaMTpQEoEI4L7ak7KORfyoCa4jLIMNFpAMOi7FIX-JVP132/pub?gid=2101441845&single=true&output=csv';
+const URL_BAJAS = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQMDxJZ_QVjWKqD44LIy9q_vvBIElkZQBaMTpQEoEI4L7ak7KORfyoCa4jLIMNFpAMOi7FIX-JVP132/pub?gid=868163741&single=true&output=csv';
+
+// ── APPS SCRIPT (para marcar "Trasladado" al usar TRFMAS en Movimientos) ──
+// Pega aquí la URL de despliegue de tu Apps Script (termina en /exec) una vez
+// que lo instales y despliegues para esta hoja de cálculo (ver Code.gs).
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwGtDfdHvzK_ehYztNUvuvYAuucpfN8YRr6_RKq2QeNy1Pnv1DWXK8yqJ5sD0rhzWoA3w/exec';
+// Debe ser EXACTAMENTE el mismo texto que la constante TOKEN en Code.gs
+const UPLOAD_TOKEN = '2026';
+
+const ALERT_DAYS = 90;
+const CACHE_TTL  = 5 * 60 * 1000; // 5 minutos en ms
+
+// ── CACHÉ EN sessionStorage ──────────────────
+// Los datos se guardan con timestamp. Si tienen menos de 5 min, no se vuelven a pedir.
+// Al presionar "Actualizar" se fuerza ignorar el caché.
+function cacheGet(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) { sessionStorage.removeItem(key); return null; }
+    return data;
+  } catch { return null; }
+}
+function cacheSet(key, data) {
+  try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+function cacheClear(key) {
+  try { sessionStorage.removeItem(key); } catch {}
+}
+
+async function fetchCSV(url, forceRefresh = false) {
+  const cacheKey = 'csv_' + btoa(url.split('gid=')[1] || url).slice(0, 12);
+
+  // Devolver caché si existe y no se fuerza refresco
+  if (!forceRefresh) {
+    const cached = cacheGet(cacheKey);
+    if (cached) return cached;
+  }
+
+  // Fetch directo a Google Sheets (funciona desde GitHub Pages sin proxy)
+  try {
+    const r = await fetch(url + '&t=' + Date.now(), { signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const text = await r.text();
+      cacheSet(cacheKey, text);
+      return text;
+    }
+  } catch {}
+
+  // Fallback: un solo proxy si el directo falla
+  try {
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (r.ok) {
+      const text = await r.text();
+      if (text && text.length > 10) { cacheSet(cacheKey, text); return text; }
+    }
+  } catch {}
+
+  throw new Error('No se pudo obtener los datos. Verifica tu conexion.');
+}
+
+let dataSaldo = [];
+let dataMov   = [];
+let dataBajas = [];
+
+// =============================================
+// PARSE CSV (manejo de comillas y comas)
+// =============================================
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return { headers: [], rows: [] };
+  const parseRow = (line) => {
+    const result = []; let inQ = false, cur = '';
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; }
+      else if (line[i] === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else { cur += line[i]; }
+    }
+    result.push(cur.trim());
+    return result;
+  };
+  const headers = parseRow(lines[0]);
+  const rows = lines.slice(1).map(l => parseRow(l));
+  return { headers, rows };
+}
+
+function toObjects(headers, rows) {
+  return rows.map(r => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (r[i] || '').trim());
+    return obj;
+  }).filter(o => Object.values(o).some(v => v !== ''));
+}
+
+function ts() {
+  return 'Actualizado: ' + new Date().toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// =============================================
+// DETECCION AUTOMATICA DE COLUMNAS
+// =============================================
+function detectCol(keys, patterns) {
+  for (const pat of patterns) {
+    const found = keys.find(k => pat.test(k));
+    if (found) return found;
+  }
+  return null;
+}
+
+function getSaldoCols(keys) {
+  // Buscamos el nombre exacto de la columna "SALDO" (limpiando espacios)
+  const colSaldo = keys.find(k => k.trim().toUpperCase() === "SALDO");
+  
+  return {
+    codigo:      detectCol(keys, [/^cod/i, /sku/i, /item/i]) || keys[0],
+    desc:        detectCol(keys, [/desc/i, /nombre/i]) || keys[1],
+    whs:         detectCol(keys, [/whs/i]) || keys[2], 
+    ubic:        detectCol(keys, [/ubic/i, /loc/i]) || keys[3], 
+    lote_bpcs:   detectCol(keys, [/lote bpcs/i]),
+    lote_fisico: detectCol(keys, [/lote fisico/i]),
+    expira:      detectCol(keys, [/expir/i, /fecha/i]) || keys[5],
+    
+    // CORRECCIÓN: Usamos la variable colSaldo directamente
+    cantidad:    colSaldo 
+  };
+}
+  
+function getMovCols(keys) {
+  // Depuración opcional: console.log("Cabeceras de movimientos:", keys);
+  
+  return {
+    fecha:    detectCol(keys, [/fecha/i, /registro/i, /time/i]) || keys[1],
+    codigo:   detectCol(keys, [/^RBRPD$/i, /codigo/i]) || keys[5],
+    
+    // AQUÍ ESTÁ EL CAMBIO:
+    bpcs:     detectCol(keys, [/^RBLOT$/i, /^RCCUS$/i, /bpcs/i]) || keys[2],
+    
+    lote:     null, 
+    origen:   detectCol(keys, [/^RFRLC$/i, /origen/i]) || keys[8],
+    destino:  detectCol(keys, [/^RTOLC$/i, /destino/i, /to/i]) || keys[9],
+    cantidad: detectCol(keys, [/^RQTYT$/i, /cantidad/i, /qty/i]) || keys[7],
+    usuario:  detectCol(keys, [/^RCOM$/i, /usuario/i, /user/i]) || keys[12],
+    id:         detectCol(keys, [/^id$/i]) || keys[0],
+    comentario: detectCol(keys, [/^comentario$/i, /coment/i]) || keys[13],
+  };
+}
+
+// =============================================
+// CALCULAR DIAS HASTA VENCIMIENTO
+// =============================================
+function daysToExpiry(str) {
+  if (!str || str === '0') return null; // Ignora ceros o celdas vacías
+  const s = String(str).trim();
+  let d;
+
+  // NUEVO: Soporte para formato YYYYMMDD (como 20230428)
+  if (/^\d{8}$/.test(s)) {
+    const yyyy = s.substring(0, 4);
+    const mm = s.substring(4, 6);
+    const dd = s.substring(6, 8);
+    d = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
+  } 
+  // Formatos anteriores (dd/mm/yy o dd/mm/yyyy)
+  else if (/^\d{2}\/\d{2}\/\d{2}$/.test(s)) {
+    const [dd, mm, yy] = s.split('/');
+    d = new Date(2000 + parseInt(yy), parseInt(mm) - 1, parseInt(dd));
+  } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const [dd, mm, yyyy] = s.split('/');
+    d = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
+  } else {
+    d = new Date(s);
+  }
+
+  if (!d || isNaN(d.getTime())) return null;
+  
+  const today = new Date(); 
+  today.setHours(0, 0, 0, 0);
+  // Calcula la diferencia en días
+  return Math.floor((d - today) / 86400000);
+}
+
+function statusBadge(days) {
+  if (days === null) return '<span style="color:#707978;font-size:11px;">—</span>';
+  if (days < 0)   return '<span class="badge-error">VENCIDO</span>';
+  if (days === 0) return '<span class="badge-error">HOY</span>';
+  if (days <= 60) return '<span class="badge-error">⚠ ' + days + 'd</span>';
+  if (days <= 90) return '<span class="badge-warn">⚡ ' + days + 'd</span>';
+  return '<span class="badge-ok">OK</span>';
+}
+
+// =============================================
+// CARGAR SALDO
+// =============================================
+async function loadSaldo(forceRefresh = true) {
+  const btn = document.getElementById('btn-saldo');
+  btn.innerHTML = '<span class="material-symbols-outlined spin text-[16px]">sync</span> Cargando...';
+  document.getElementById('tbody-saldo').innerHTML = '<tr class="loading-row"><td colspan="8"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Conectando con Google Sheets...</td></tr>';
+  document.getElementById('tbody-alertas').innerHTML = '<tr class="loading-row"><td colspan="8"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Cargando alertas...</td></tr>';
+
+  try {
+    const text = await fetchCSV(URL_SALDO, forceRefresh);
+    const { headers, rows } = parseCSV(text);
+    invalidarCachesCols();
+    dataSaldo = toObjects(headers, rows);
+    buildSearchIndex('saldo', dataSaldo);
+    refrescarVistaSaldo();
+    refrescarVistaAlertas();
+    updateKPIsAndDonut(dataSaldo);
+    const t = ts();
+    document.getElementById('last-update-saldo').textContent = t;
+    document.getElementById('last-update-alertas').textContent = t;
+    document.getElementById('last-update-global').textContent = t;
+  } catch(e) {
+    const msg = '<tr class="error-row"><td colspan="8">Error al cargar: ' + e.message + '. Verifica que el sheet sea publico.</td></tr>';
+    document.getElementById('tbody-saldo').innerHTML = msg;
+    document.getElementById('tbody-alertas').innerHTML = '<tr class="error-row"><td colspan="8">Error al cargar alertas</td></tr>';
+  }
+  btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar';
+}
+
+// =============================================
+// DESCARGAR PLANTILLA DE SALDO (basada en cabeceras reales del Sheet)
+// =============================================
+function descargarPlantillaSaldo() {
+  if (!dataSaldo.length) {
+    alert('Aún no se han cargado datos de Saldo. Presiona "Actualizar" primero (se usan como base para armar la plantilla con las cabeceras correctas).');
+    return;
+  }
+
+  // Las cabeceras vienen del CSV en el mismo orden que las columnas del Sheet:
+  // headers[0] = A (ID SALDO), headers[1..9] = B..J, headers[10] = K (ESTATUS), etc.
+  const headers = Object.keys(dataSaldo[0]);
+  if (headers.length < 10) {
+    alert('No se pudo determinar la estructura de columnas del Sheet (se esperaban al menos 10 columnas).');
+    return;
+  }
+  const templateHeaders = headers.slice(1, 10); // B..J -> 9 columnas
+
+  const aoa = [templateHeaders];
+  dataSaldo.forEach(row => {
+    aoa.push(templateHeaders.map(h => row[h] || ''));
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Plantilla Saldo');
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `plantilla_saldo_${fecha}.xlsx`);
+}
+
+// =============================================
+// CARGAR PLANTILLA -> SOBRE-ESCRIBE "0. SALDO" EN EL SHEET
+// =============================================
+async function cargarPlantillaSaldo(event) {
+  const file = event.target.files[0];
+  event.target.value = ''; // permite volver a elegir el mismo archivo despues
+  if (!file) return;
+
+  if (!APPS_SCRIPT_URL) {
+    alert('Falta configurar APPS_SCRIPT_URL en el código (constante al inicio del script). Revisa las instrucciones de Code.gs.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-plantilla-saldo');
+  const btnOriginal = btn.innerHTML;
+
+  try {
+    // Leer archivo (xlsx, xls o csv) con SheetJS
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+
+    if (!aoa.length) { alert('El archivo está vacío.'); return; }
+
+    const headers = aoa[0].map(h => String(h || '').trim());
+    const rows = aoa.slice(1).filter(r => r.some(v => String(v || '').trim() !== ''));
+
+    if (!rows.length) { alert('La plantilla no tiene filas de datos (solo cabeceras).'); return; }
+
+    const confirmMsg = `Vas a SOBRE-ESCRIBIR la pestaña "0. SALDO" con ${rows.length} fila(s).\n\n` +
+      `Esto reemplaza toda la información actual de esa hoja (columnas A-K se regeneran, columnas L-U se limpian).\n\n` +
+      `¿Confirmas que deseas continuar?`;
+    if (!confirm(confirmMsg)) return;
+
+    btn.innerHTML = '<span class="material-symbols-outlined spin text-[16px]">sync</span> Subiendo...';
+    btn.style.pointerEvents = 'none';
+
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+      body: JSON.stringify({ token: UPLOAD_TOKEN, headers, rows })
+    });
+
+    const result = await resp.json();
+
+    if (!result.ok) {
+      alert('No se pudo cargar la plantilla:\n' + (result.error || 'Error desconocido'));
+      return;
+    }
+
+    alert(`Listo. Se escribieron ${result.filas} fila(s) en "0. SALDO".\n\n` +
+      `Nota: el Sheet publicado (CSV) puede tardar 1-2 minutos en reflejar el cambio. ` +
+      `Presiona "Actualizar" en unos momentos si aún ves datos viejos.`);
+
+    setTimeout(() => loadSaldo(true), 3000);
+
+  } catch (e) {
+    alert('Error al procesar/subir la plantilla: ' + e.message);
+  } finally {
+    btn.innerHTML = btnOriginal;
+    btn.style.pointerEvents = '';
+  }
+}
+
+// =============================================
+// RENDER SALDO (virtual scroll, fragment rendering)
+// =============================================
+function renderSaldo(data, replace = true) {
+  const tbody = document.getElementById('tbody-saldo');
+  if (!data.length) { 
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="9">Sin saldo en inventario</td></tr>'; 
+    return; 
+  }
+  
+  const cols = getSaldoColsCached(Object.keys(data[0]));
+  const frag = document.createDocumentFragment();
+  
+  data.forEach(row => {
+    const days = daysToExpiry(row[cols.expira]);
+    const rowClass = days !== null && days < 0 ? 'text-error font-medium' : days !== null && days <= ALERT_DAYS ? 'text-amber-600 font-medium' : 'text-on-surface';
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-surface-container-low transition-colors ' + rowClass;
+    tr.innerHTML =
+        '<td class="px-3 py-3 text-center border border-outline-variant"><input type="checkbox" class="row-check w-4 h-4 accent-primary cursor-pointer"></td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.codigo]||'—') + '</td>'
+      + '<td class="px-3 py-3 border border-outline-variant">' + (row[cols.desc]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.whs]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.ubic]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.lote_bpcs]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.lote_fisico]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.expira]||'—') + '</td>'
+      + '<td class="px-3 py-3 text-right font-label-data font-bold border border-outline-variant">' + (row[cols.cantidad]||'0') + '</td>'
+      + '<td class="px-3 py-3 text-center border border-outline-variant">' + statusBadge(days) + '</td>';
+    frag.appendChild(tr);
+  });
+  if (replace) tbody.innerHTML = '';
+  tbody.appendChild(frag);
+}
+
+// =============================================
+// RENDER ALERTAS (fragment rendering, cached cols)
+// =============================================
+function renderAlertas(data) {
+  const tbody = document.getElementById('tbody-alertas');
+  
+  if (!data.length) { 
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="8">Sin alertas criticas</td></tr>'; 
+    return; 
+  }
+  
+  const cols = getSaldoColsCached(Object.keys(data[0]));
+
+  const alertas = data
+    .map(row => ({ row, days: daysToExpiry(row[cols.expira]) }))
+    .filter(x => {
+      const esCritico = (x.days !== null && x.days <= ALERT_DAYS);
+      const valorWhs = (x.row[cols.whs] || '').toUpperCase();
+      const esExcluida = valorWhs.includes('LF') || valorWhs.includes('OB');
+      return esCritico && !esExcluida;
+    })
+    .sort((a, b) => a.days - b.days);
+
+  // Actualizar KPI y badge superior
+  document.getElementById('kpi-alertas').textContent = alertas.length.toLocaleString();
+  document.getElementById('alert-badge').classList.toggle('hidden', alertas.length === 0);
+
+  if (!alertas.length) {
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="9" style="color:#2e7d32">Sin alertas criticas</td></tr>';
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  alertas.forEach(({ row, days }) => {
+    const rowClass = days <= 0 ? 'text-error font-medium' : 'text-amber-600 font-medium';
+    const diasLabel = days < 0 ? 'VENCIDO (' + Math.abs(days) + 'd)' : days === 0 ? 'HOY' : days + ' dias';
+    const badge = days <= 0 ? '<span class="badge-error">VENCIDO</span>' : days <= 60 ? '<span class="badge-error">CRITICO</span>' : '<span class="badge-warn">PROXIMO</span>';
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-surface-container-low transition-colors ' + rowClass;
+    tr.innerHTML =
+        '<td class="px-3 py-3 text-center border border-outline-variant"><input type="checkbox" class="row-check w-4 h-4 accent-primary cursor-pointer"></td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.codigo]||'—') + '</td>'
+      + '<td class="px-3 py-3 border border-outline-variant">' + (row[cols.desc]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.lote_fisico]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.whs]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.ubic]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.cantidad]||'0') + '</td>'
+      + '<td class="px-3 py-3 font-label-data border border-outline-variant">' + (row[cols.expira]||'—') + '</td>'
+      + '<td class="px-3 py-3 font-label-data font-bold border border-outline-variant">' + diasLabel + '</td>'
+      + '<td class="px-3 py-3 text-center border border-outline-variant">' + badge + '</td>';
+    frag.appendChild(tr);
+  });
+  tbody.innerHTML = '';
+  tbody.appendChild(frag);
+}
+  
+// =============================================
+// CARGAR MOVIMIENTOS
+// =============================================
+async function loadMov(forceRefresh = true) {
+  const btn = document.getElementById('btn-mov');
+  btn.innerHTML = '<span class="material-symbols-outlined spin text-[16px]">sync</span> Cargando...';
+  document.getElementById('tbody-mov').innerHTML = '<tr class="loading-row"><td colspan="9"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Conectando con Google Sheets...</td></tr>';
+
+  try {
+    const text = await fetchCSV(URL_MOV, forceRefresh);
+    const { headers, rows } = parseCSV(text);
+    dataMov = toObjects(headers, rows);
+    if (dataMov.length) aplicarOverridesTrasladado(dataMov, getMovColsCached(Object.keys(dataMov[0])));
+    buildSearchIndex('mov', dataMov);
+    refrescarVistaMov();
+    document.getElementById('last-update-mov').textContent = ts();
+  } catch(e) {
+    document.getElementById('tbody-mov').innerHTML = '<tr class="error-row"><td colspan="9">Error al cargar movimientos: ' + e.message + '</td></tr>';
+  }
+  btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar';
+}
+
+// =============================================
+// RENDER MOVIMIENTOS (fragment rendering, cached cols)
+// =============================================
+function renderMov(data, replace = true) {
+  const tbody = document.getElementById('tbody-mov');
+  if (!data.length) { tbody.innerHTML = '<tr class="loading-row"><td colspan="9">Sin movimientos registrados</td></tr>'; return; }
+  
+  const cols = getMovColsCached(Object.keys(data[0]));
+  const frag = document.createDocumentFragment();
+  
+  data.forEach(row => {
+    const destino = row[cols.destino] || '';
+    const cantidad= row[cols.cantidad] || '';
+    const esTrasladado = String(row[cols.comentario] || '').trim().toLowerCase() === 'trasladado';
+    const estadoBadge = esTrasladado
+      ? '<span class="badge-ok">TRASLADADO</span>'
+      : '<span class="badge-warn">PENDIENTE</span>';
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-surface-container-low transition-colors';
+    tr.dataset.id = row[cols.id] || '';
+    tr.innerHTML =
+        `<td class="px-3 py-3 text-center border border-outline-variant"><input type="checkbox" class="row-check w-4 h-4 accent-primary cursor-pointer"></td>`
+      + `<td class="px-3 py-3 font-label-data whitespace-nowrap border border-outline-variant">${row[cols.fecha]||'—'}</td>`
+      + `<td class="px-3 py-3 font-label-data border border-outline-variant">${row[cols.codigo]||'—'}</td>`
+      + `<td class="px-3 py-3 font-label-data border border-outline-variant">${row[cols.bpcs]||'—'}</td>`
+      + `<td class="px-3 py-3 border border-outline-variant">${row[cols.origen]||'—'}</td>`
+      + `<td class="px-3 py-3 font-label-data border border-outline-variant">${destino||'—'}</td>`
+      + `<td class="px-3 py-3 text-right font-label-data font-bold border border-outline-variant">${cantidad||'0'}</td>`
+      + `<td class="px-3 py-3 border border-outline-variant">${row[cols.usuario]||'—'}</td>`
+      + `<td class="px-3 py-3 text-center border border-outline-variant">${estadoBadge}</td>`;
+    frag.appendChild(tr);
+  });
+  if (replace) tbody.innerHTML = '';
+  tbody.appendChild(frag);
+}
+
+// =============================================
+// KPIs + DONUT — un solo loop sobre los datos (fix #6 consolidacion de procesos)
+// =============================================
+function updateKPIsAndDonut(data) {
+  if (!data.length) return;
+  const cols = getSaldoColsCached(Object.keys(data[0]));
+  
+  let total = 0, vencidos = 0;
+  let vig = 0, prox = 0, venc = 0;
+
+  data.forEach(row => {
+    let rawQty = (row[cols.cantidad] || '0').toString().trim();
+    let cleanQty = rawQty.replace(/[^\d.,]/g, '');
+    if (cleanQty.includes(',') && cleanQty.includes('.')) {
+      cleanQty = cleanQty.replace(/\./g, '').replace(',', '.');
+    } else if (cleanQty.includes(',')) {
+      cleanQty = cleanQty.replace(',', '.');
+    } else {
+      cleanQty = cleanQty.replace(/\./g, '');
+    }
+    let qty = parseFloat(cleanQty) || 0;
+    total += qty;
+
+    const d = daysToExpiry(row[cols.expira]);
+    if (d !== null && d < 0) { vencidos += qty; venc += Math.abs(qty); }
+    else if (d !== null && d <= ALERT_DAYS) { prox += qty; }
+    else { vig += qty; }
+  });
+
+  // KPIs
+  document.getElementById('kpi-total').textContent      = Math.round(total).toLocaleString('es-PE');
+  document.getElementById('kpi-disponible').textContent = Math.round(total - vencidos).toLocaleString('es-PE');
+  document.getElementById('kpi-bajas').textContent      = Math.round(vencidos).toLocaleString('es-PE');
+
+  // Donut
+  const totalD = (vig + prox + venc) || 1;
+  const pct    = Math.round((vig / totalD) * 100);
+  document.getElementById('donut-pct').textContent        = pct + '%';
+  document.getElementById('legend-vigentes').textContent  = vig.toLocaleString();
+  document.getElementById('legend-cercanos').textContent  = prox.toLocaleString();
+  document.getElementById('legend-vencidos').textContent  = venc.toLocaleString();
+
+  const canvas = document.getElementById('donut-chart');
+  const ctx    = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 144, 144);
+  const segs = [
+    { v: vig, c: '#0f6b35' },
+    { v: prox, c: '#f59e0b' },
+    { v: venc, c: '#ba1a1a' }
+  ];
+  let start = -Math.PI / 2;
+  segs.forEach(s => {
+    const sweep = (s.v / totalD) * 2 * Math.PI;
+    if (sweep <= 0) return;
+    ctx.beginPath(); ctx.moveTo(72, 72);
+    ctx.arc(72, 72, 58, start, start + sweep);
+    ctx.closePath(); ctx.fillStyle = s.c; ctx.fill();
+    start += sweep;
+  });
+  ctx.beginPath(); ctx.arc(72, 72, 40, 0, 2 * Math.PI);
+  ctx.fillStyle = '#f4faf6'; ctx.fill();
+}
+
+// Mantener compatibilidad con llamadas individuales
+function updateKPIs(data)  { /* delegado a updateKPIsAndDonut */ }
+function updateDonut(data) { /* delegado a updateKPIsAndDonut */ }
+
+
+// =============================================
+// CONSULTA RÁPIDA DE LOTE
+// =============================================
+function buscarLote() {
+  const q = document.getElementById('lote-query').value.trim().toLowerCase();
+  const msg      = document.getElementById('lote-msg');
+  const header   = document.getElementById('lote-header');
+  const tabla    = document.getElementById('lote-tabla');
+
+  // Reset
+  header.classList.add('hidden');
+  tabla.classList.add('hidden');
+  msg.classList.add('hidden');
+  msg.textContent = '';
+
+  if (!q) return;
+
+  if (!dataSaldo.length) {
+    msg.textContent = 'Los datos aún no han cargado. Presiona Actualizar.';
+    msg.classList.remove('hidden');
+    return;
+  }
+
+  const cols = getSaldoCols(Object.keys(dataSaldo[0]));
+
+  // Buscar coincidencias exactas por Lote BPCS
+  const matches = dataSaldo.filter(r =>
+    String(r[cols.lote_bpcs] || '').toLowerCase() === q
+  );
+
+  // Si no hay exacta, buscar parcial
+  const results = matches.length
+    ? matches
+    : dataSaldo.filter(r => String(r[cols.lote_bpcs] || '').toLowerCase().includes(q));
+
+  if (!results.length) {
+    msg.textContent = 'No se encontró ningún lote con ese valor.';
+    msg.classList.remove('hidden');
+    return;
+  }
+
+  // Todos los resultados comparten lote físico y expiración (son del mismo BPCS)
+  const first = results[0];
+  const days  = daysToExpiry(first[cols.expira]);
+
+  // Encabezado
+  document.getElementById('lote-desc-val').textContent   = first[cols.desc]        || '—';
+  document.getElementById('lote-fisico-val').textContent = first[cols.lote_fisico]  || '—';
+
+  const expEl = document.getElementById('lote-expira-val');
+  expEl.textContent = first[cols.expira] || '—';
+  expEl.className = 'font-label-data text-[13px] font-bold ' +
+    (days !== null && days < 0  ? 'text-error' :
+     days !== null && days <= 30 ? 'text-amber-600' : 'text-on-surface');
+
+  document.getElementById('lote-estado-val').innerHTML = statusBadge(days);
+  header.classList.remove('hidden');
+
+  // Tabla de ubicaciones
+  let totalCant = 0;
+  let tbodyHtml = '';
+
+  results.forEach(r => {
+    let rawQty = String(r[cols.cantidad] || '0').replace(/[^\d.,]/g, '');
+    if (rawQty.includes(',') && rawQty.includes('.')) rawQty = rawQty.replace(/\./g,'').replace(',','.');
+    else if (rawQty.includes(',')) rawQty = rawQty.replace(',','.');
+    else rawQty = rawQty.replace(/\./g,'');
+    const qty = parseFloat(rawQty) || 0;
+    totalCant += qty;
+
+    tbodyHtml += '<tr class="hover:bg-surface-container-low border-b border-outline-variant last:border-0">'
+      + '<td class="px-2 py-1.5 font-label-data">' + (r[cols.ubic] || '—') + '</td>'
+      + '<td class="px-2 py-1.5 font-label-data text-on-surface-variant">' + (r[cols.whs] || '—') + '</td>'
+      + '<td class="px-2 py-1.5 font-label-data font-bold text-right">' + Math.round(qty).toLocaleString('es-PE') + '</td>'
+      + '</tr>';
+  });
+
+  document.getElementById('lote-tbody').innerHTML = tbodyHtml;
+  document.getElementById('lote-count').textContent = results.length;
+  document.getElementById('lote-total').textContent = Math.round(totalCant).toLocaleString('es-PE');
+  tabla.classList.remove('hidden');
+
+  if (!matches.length) {
+    msg.textContent = 'Búsqueda parcial: ' + results.length + ' resultado(s).';
+    msg.classList.remove('hidden');
+  }
+}
+
+
+function filterSaldo() {
+  if (!dataSaldo.length) { alert('Los datos aun no han cargado. Presiona Actualizar primero.'); return; }
+  const q      = document.getElementById('search-saldo').value.toLowerCase().trim();
+  const whs    = document.getElementById('filter-whs-saldo').value.toLowerCase().trim();
+  const codigoRaw = document.getElementById('filter-codigo-saldo').value.toLowerCase().trim();
+  const lote   = document.getElementById('filter-lote-saldo').value.toLowerCase().trim();
+
+  // Soporte multi-código: separar por coma y limpiar espacios
+  const codigos = codigoRaw ? codigoRaw.split(',').map(c => c.trim()).filter(Boolean) : [];
+
+  if (!q && !whs && !codigos.length && !lote) { renderVirtual('saldo', dataSaldo, renderSaldo); return; }
+
+  const cols = getSaldoColsCached(Object.keys(dataSaldo[0]));
+
+  const filtered = dataSaldo.filter((r, i) => {
+    const coincideTexto  = !q             || _searchIndex.saldo[i].includes(q);
+    const coincideWhs    = !whs           || String(r[cols.whs]         || '').toLowerCase().includes(whs);
+    const valorCodigo    = String(r[cols.codigo] || '').toLowerCase();
+    const coincideCodigo = !codigos.length || codigos.some(c => valorCodigo.includes(c));
+    const coincideLote   = !lote          || String(r[cols.lote_bpcs]   || '').toLowerCase().includes(lote)
+                                          || String(r[cols.lote_fisico] || '').toLowerCase().includes(lote);
+    return coincideTexto && coincideWhs && coincideCodigo && coincideLote;
+  });
+
+  renderVirtual('saldo', filtered, renderSaldo);
+}
+
+function clearFilterSaldo() {
+  document.getElementById('search-saldo').value         = '';
+  document.getElementById('filter-whs-saldo').value     = '';
+  document.getElementById('filter-codigo-saldo').value  = '';
+  document.getElementById('filter-lote-saldo').value    = '';
+  renderVirtual('saldo', dataSaldo, renderSaldo);
+}
+
+function filterMov() {
+  if (!dataMov.length) { alert('Los datos aun no han cargado. Presiona Actualizar primero.'); return; }
+  const q = document.getElementById('search-mov').value.toLowerCase().trim();
+  const fechaDesde = document.getElementById('fecha-desde').value;
+  const fechaHasta = document.getElementById('fecha-hasta').value;
+  const estadoSel  = document.getElementById('filter-comentario-mov').value; // '', 'pendiente', 'trasladado'
+
+  const cols = getMovColsCached(Object.keys(dataMov[0]));
+  const colFecha = cols.fecha;
+
+  // Usa índice para búsqueda de texto; aplica filtro de fecha solo a resultados que pasan texto
+  let filtered = dataMov.filter((r, i) => {
+    const coincideTexto = !q || _searchIndex.mov[i].includes(q);
+    let cumpleDesde = true, cumpleHasta = true;
+    if ((fechaDesde || fechaHasta) && colFecha) {
+      const fechaRaw = String(r[colFecha] || '').trim();
+      const partes = fechaRaw.split(' ')[0].split('/');
+      let fechaISO = '';
+      if (partes.length === 3 && partes[2].length === 4)
+        fechaISO = `${partes[2]}-${partes[1].padStart(2,'0')}-${partes[0].padStart(2,'0')}`;
+      else if (partes.length === 3 && partes[2].length === 2)
+        fechaISO = `20${partes[2]}-${partes[1].padStart(2,'0')}-${partes[0].padStart(2,'0')}`;
+      cumpleDesde = !fechaDesde || fechaISO >= fechaDesde;
+      cumpleHasta = !fechaHasta || fechaISO <= fechaHasta;
+    }
+    const comentarioVal = String(r[cols.comentario] || '').trim().toLowerCase();
+    const esTrasladado   = comentarioVal === 'trasladado';
+    const cumpleEstado = !estadoSel
+      || (estadoSel === 'trasladado' && esTrasladado)
+      || (estadoSel === 'pendiente'  && !esTrasladado);
+    return coincideTexto && cumpleDesde && cumpleHasta && cumpleEstado;
+  });
+
+  renderVirtual('mov', filtered, renderMov);
+}
+
+function clearFilterMov() {
+  document.getElementById('search-mov').value = '';
+  document.getElementById('fecha-desde').value = '';
+  document.getElementById('fecha-hasta').value = '';
+  document.getElementById('filter-comentario-mov').value = '';
+  renderVirtual('mov', dataMov, renderMov);
+}
+
+function filterAlertas() {
+  if (!dataSaldo.length) { alert('Los datos aun no han cargado. Presiona Actualizar primero.'); return; }
+  const q   = document.getElementById('search-alertas').value.toLowerCase().trim();
+  const whs = document.getElementById('filter-whs-alertas').value.toLowerCase().trim();
+
+  if (!q && !whs) { renderAlertas(dataSaldo); return; }
+
+  const cols = getSaldoColsCached(Object.keys(dataSaldo[0]));
+  renderAlertas(dataSaldo.filter((r, i) => {
+    const coincideTexto = !q  || _searchIndex.saldo[i].includes(q);
+    const coincideWhs   = !whs || String(r[cols.whs] || '').toLowerCase().includes(whs);
+    return coincideTexto && coincideWhs;
+  }));
+}
+
+function clearFilterAlertas() {
+  document.getElementById('search-alertas').value = '';
+  document.getElementById('filter-whs-alertas').value = '';
+  renderAlertas(dataSaldo);
+}
+// =============================================
+// DEBOUNCE — evita render en cada tecla
+// =============================================
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+const debouncedFilterSaldo = debounce(filterSaldo, 250);
+const debouncedFilterMov   = debounce(filterMov, 250);
+
+const debouncedFilterAlertas = debounce(filterAlertas, 250);
+const debouncedFilterBajas   = debounce(filterBajas, 250);
+
+// =============================================
+// BUSQUEDA GLOBAL
+// =============================================
+const debouncedGlobalSearch = debounce(function(q) {
+  if (!q) {
+    renderVirtual('saldo', dataSaldo, renderSaldo);
+    renderVirtual('mov', dataMov, renderMov);
+    renderAlertas(dataSaldo);
+    return;
+  }
+  const ql = q.toLowerCase();
+  const filtSaldo = dataSaldo.filter((_, i) => _searchIndex.saldo[i] && _searchIndex.saldo[i].includes(ql));
+  const filtMov   = dataMov.filter((_, i)   => _searchIndex.mov[i]   && _searchIndex.mov[i].includes(ql));
+  renderVirtual('saldo', filtSaldo, renderSaldo);
+  renderVirtual('mov',   filtMov,   renderMov);
+  renderAlertas(filtSaldo);
+}, 300);
+
+document.getElementById('global-search').addEventListener('input', function() {
+  debouncedGlobalSearch(this.value);
+});
+
+// =============================================
+// VIRTUAL SCROLL — renderiza solo filas visibles (~200 activas)
+// =============================================
+const VIRTUAL_PAGE_SIZE = 200;
+let _vsOffset = { saldo: 0, mov: 0, bajas: 0 };
+let _vsData   = { saldo: [], mov: [], bajas: [] };
+
+function renderVirtual(type, data, renderFn) {
+  _vsData[type]   = data;
+  _vsOffset[type] = 0;
+  renderFn(data.slice(0, VIRTUAL_PAGE_SIZE), true);
+  const container = document.getElementById(
+    type === 'saldo' ? 'saldo-scroll-inner' :
+    type === 'mov'   ? 'mov-scroll-inner'   : 'bajas-scroll-inner'
+  );
+  if (container) {
+    container.onscroll = null;
+    container.onscroll = () => {
+      if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
+        _vsOffset[type] += VIRTUAL_PAGE_SIZE;
+        const next = _vsData[type].slice(_vsOffset[type], _vsOffset[type] + VIRTUAL_PAGE_SIZE);
+        if (next.length) renderFn(next, false);
+      }
+    };
+  }
+}
+
+// =============================================
+// CACHE DE COLUMNAS (evita Object.keys + getSaldoCols repetido)
+// =============================================
+let _saldoColsCache = null;
+let _movColsCache   = null;
+let _bajasColsCache = null;
+
+function getSaldoColsCached(keys) {
+  if (!_saldoColsCache) _saldoColsCache = getSaldoCols(keys);
+  return _saldoColsCache;
+}
+function getMovColsCached(keys) {
+  if (!_movColsCache) _movColsCache = getMovCols(keys);
+  return _movColsCache;
+}
+function getBajasColsCached(keys) {
+  if (!_bajasColsCache) _bajasColsCache = getBajasCols(keys);
+  return _bajasColsCache;
+}
+
+// INVALIDAR cache al recargar datos
+function invalidarCachesCols() {
+  _saldoColsCache = null;
+  _movColsCache   = null;
+  _bajasColsCache = null;
+}
+
+// =============================================
+// INDICE DE BUSQUEDA — evita Object.values() en cada tecla
+// =============================================
+let _searchIndex = { saldo: [], mov: [], bajas: [] };
+
+function buildSearchIndex(type, data) {
+  _searchIndex[type] = data.map(row => Object.values(row).join('\u0000').toLowerCase());
+}
+
+function searchWithIndex(type, q) {
+  return _searchIndex[type].map((str, i) => str.includes(q) ? _vsData[type][i] || null : null).filter(Boolean);
+}
+
+
+function toggleAllCheck(tbodyId, checked) {
+  document.querySelectorAll('#' + tbodyId + ' .row-check').forEach(chk => chk.checked = checked);
+}
+
+// Obtener filas seleccionadas o todas las visibles de un tbody
+function getRowsForExport(tbodyId) {
+  const allRows = Array.from(document.querySelectorAll('#' + tbodyId + ' tr')).filter(tr =>
+    !tr.classList.contains('loading-row') && !tr.classList.contains('error-row')
+  );
+  const selected = allRows.filter(tr => tr.querySelector('.row-check')?.checked);
+  return selected.length > 0 ? selected : allRows;
+}
+
+// =============================================
+// EXPORTAR XLSX
+// =============================================
+function exportCSV(type) {
+  let data, filename, sheetName;
+
+  if (type === 'saldo') {
+    // Exportar desde _vsData.saldo para incluir TODOS los registros filtrados,
+    // no solo los visibles en pantalla (virtual scroll)
+    const checkedRows = Array.from(document.querySelectorAll('#tbody-saldo .row-check:checked'));
+    let source;
+    if (checkedRows.length > 0) {
+      // Si hay checkboxes seleccionados, exportar solo esos (leídos del DOM)
+      source = checkedRows.map(chk => {
+        const tds = chk.closest('tr').querySelectorAll('td');
+        return { CODIGO: tds[1]?.innerText, DESCRIPCION: tds[2]?.innerText, WHS: tds[3]?.innerText,
+                 UBICACION: tds[4]?.innerText, LOTE_BPCS: tds[5]?.innerText, LOTE_FISICO: tds[6]?.innerText,
+                 EXPIRA: tds[7]?.innerText, CANTIDAD: tds[8]?.innerText, ESTADO: tds[9]?.innerText };
+      });
+    } else {
+      // Sin selección: exportar todos los filtrados desde _vsData (completo)
+      const cols = getSaldoColsCached(Object.keys((_vsData.saldo[0] || dataSaldo[0] || {})));
+      source = (_vsData.saldo.length ? _vsData.saldo : dataSaldo).map(row => {
+        const days = daysToExpiry(row[cols.expira]);
+        const estado = days === null ? '—' : days < 0 ? 'VENCIDO' : days === 0 ? 'HOY' : days <= 60 ? 'CRITICO (' + days + 'd)' : days <= 90 ? 'PROXIMO (' + days + 'd)' : 'OK';
+        return { CODIGO: row[cols.codigo]||'—', DESCRIPCION: row[cols.desc]||'—', WHS: row[cols.whs]||'—',
+                 UBICACION: row[cols.ubic]||'—', LOTE_BPCS: row[cols.lote_bpcs]||'—', LOTE_FISICO: row[cols.lote_fisico]||'—',
+                 EXPIRA: row[cols.expira]||'—', CANTIDAD: row[cols.cantidad]||'0', ESTADO: estado };
+      });
+    }
+    data = source;
+    filename = 'saldo_inventario.xlsx';
+    sheetName = 'Saldo';
+  } else if (type === 'mov') {
+    const rows = getRowsForExport('tbody-mov');
+    data = rows.map(tr => {
+      const tds = tr.querySelectorAll('td');
+      return { FECHA: tds[1]?.innerText, CODIGO: tds[2]?.innerText, LOTE_BPCS: tds[3]?.innerText,
+               ORIGEN: tds[4]?.innerText, DESTINO: tds[5]?.innerText,
+               CANTIDAD: tds[6]?.innerText, USUARIO: tds[7]?.innerText };
+    });
+    filename = 'movimientos_filtrados.xlsx';
+    sheetName = 'Movimientos';
+  } else if (type === 'alertas') {
+    const rows = getRowsForExport('tbody-alertas');
+    data = rows.map(tr => {
+      const tds = tr.querySelectorAll('td');
+      return { CODIGO: tds[1]?.innerText, DESCRIPCION: tds[2]?.innerText, LOTE: tds[3]?.innerText,
+               WHS: tds[4]?.innerText, UBICACION: tds[5]?.innerText, CANTIDAD: tds[6]?.innerText,
+               FECHA_VENCE: tds[7]?.innerText, DIAS_RESTANTES: tds[8]?.innerText, ESTADO: tds[9]?.innerText };
+    });
+    filename = 'alertas_vencimiento.xlsx';
+    sheetName = 'Alertas';
+  } else if (type === 'bajas') {
+    const rows = getRowsForExport('tbody-bajas');
+    data = rows.map(tr => {
+      const tds = tr.querySelectorAll('td');
+      return { FECHA: tds[1]?.innerText, CODIGO: tds[2]?.innerText, DESCRIPCION: tds[3]?.innerText,
+               EAN13: tds[4]?.innerText, LOTE: tds[5]?.innerText, EXPIRA: tds[6]?.innerText,
+               CANTIDAD: tds[7]?.innerText, BODEGA: tds[8]?.innerText, UBIC_ORIGEN: tds[9]?.innerText,
+               UBIC_DESTINO: tds[10]?.innerText, ESTATUS: tds[11]?.innerText, USUARIO: tds[12]?.innerText };
+    });
+    filename = 'reporte_bajas.xlsx';
+    sheetName = 'Bajas';
+  }
+
+  if (!data || data.length === 0) { alert('No hay datos para exportar.'); return; }
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const cols = Object.keys(data[0]);
+  ws['!cols'] = cols.map(col => {
+    const maxLen = Math.max(col.length, ...data.map(r => String(r[col] || '').length));
+    return { wch: Math.min(maxLen + 2, 50) };
+  });
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const cellAddr = XLSX.utils.encode_cell({ r: 0, c: C });
+    if (!ws[cellAddr]) continue;
+    ws[cellAddr].s = {
+      font:      { bold: true, color: { rgb: 'FFFFFF' } },
+      fill:      { fgColor: { rgb: '584B09' } },
+      alignment: { horizontal: 'center', vertical: 'center' }
+    };
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+}
+
+// =============================================
+// EXPORTAR MOVIMIENTOS — FORMATO TRFMAS (columnas originales del Sheet)
+// =============================================
+function exportMovTRFMAS() {
+  if (!_vsData.mov.length && !dataMov.length) {
+    alert('No hay datos de movimientos para exportar. Presiona Actualizar primero.');
+    return;
+  }
+
+  // Columnas a excluir
+  const EXCLUIR    = ['ID', 'REGISTRO', 'COMENTARIO'];
+  // Columnas tipo TEXTO (aparece apóstrofe en barra de fórmulas, invisible en celda)
+  const TIPO_TEXTO = ['RBPRD', 'RBLOT', 'RFRLC', 'RTOLC', 'RRSNC', 'RCOM', 'RFRWH', 'RTOWH'];
+  // Columnas tipo NÚMERO
+  const TIPO_NUM   = ['RCCUS', 'RQTYT', 'RNDOC'];
+
+  const allVisibleRows = Array.from(document.querySelectorAll('#tbody-mov tr')).filter(tr =>
+    !tr.classList.contains('loading-row') && !tr.classList.contains('error-row')
+  );
+  const selectedRows = allVisibleRows.filter(tr => tr.querySelector('.row-check')?.checked);
+
+  let source;
+  if (selectedRows.length > 0) {
+    source = selectedRows.map(tr => {
+      const idx = allVisibleRows.indexOf(tr);
+      return _vsData.mov[idx] || null;
+    }).filter(Boolean);
+  } else {
+    source = _vsData.mov.length ? _vsData.mov : dataMov;
+  }
+
+  if (!source.length) { alert('No hay datos para exportar.'); return; }
+
+  // Filtrar cabeceras excluidas
+  const allHeaders = Object.keys(source[0]);
+  const headers    = allHeaders.filter(h => !EXCLUIR.includes(h.trim().toUpperCase()));
+
+  // Construir worksheet celda por celda para controlar tipo exacto
+  const ws = {};
+
+  // Fila de cabeceras
+  headers.forEach((h, C) => {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+    ws[addr] = {
+      t: 's', v: h,
+      s: {
+        font:      { bold: true, color: { rgb: 'FFFFFF' } },
+        fill:      { fgColor: { rgb: '584B09' } },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      }
+    };
+  });
+
+  // Filas de datos
+  source.forEach((row, rowIdx) => {
+    headers.forEach((h, C) => {
+      const key  = h.trim().toUpperCase();
+      const raw  = String(row[h] || '').trim();
+      const addr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: C });
+
+      if (TIPO_NUM.includes(key)) {
+        const num = parseFloat(raw.replace(/,/g, '')) || 0;
+        ws[addr] = { t: 'n', v: num };
+      } else {
+        // t:'s' = texto puro — Excel pone apóstrofe invisible en barra de fórmulas
+        ws[addr] = { t: 's', v: raw };
+      }
+    });
+  });
+
+  // Rango total
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: source.length, c: headers.length - 1 } });
+
+  // Ancho de columnas automático
+  ws['!cols'] = headers.map(h => {
+    let maxLen = h.length;
+    source.forEach(row => { const len = String(row[h] || '').length; if (len > maxLen) maxLen = len; });
+    return { wch: Math.min(maxLen + 2, 50) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'TRFMAS');
+  XLSX.writeFile(wb, 'TRFMAS.xls');
+
+  // Si se exportó una selección puntual (no "todos"), marcamos esas filas como Trasladado
+  if (selectedRows.length > 0) {
+    const colsMov = getMovColsCached(Object.keys(source[0]));
+    const ids = source.map(row => row[colsMov.id]).filter(Boolean);
+    if (ids.length) marcarTrasladadoMov(ids);
+  }
+}
+
+// =============================================
+// MARCAR COMO "Trasladado" LA COLUMNA COMENTARIO EN EL SHEET
+// =============================================
+// El CSV publicado del Sheet tarda 1-2 min en reflejar cambios escritos vía
+// Apps Script. Mientras tanto, guardamos aquí los IDs recién marcados para
+// que un auto-refresco de por medio no los "regrese" a Pendiente en pantalla.
+const _trasladadosOverride = {}; // id -> timestamp en que se marcó
+const OVERRIDE_TTL = 5 * 60 * 1000; // 5 minutos: tiempo de sobra para que el CSV se actualice
+
+function aplicarOverridesTrasladado(data, cols) {
+  const now = Date.now();
+  Object.keys(_trasladadosOverride).forEach(id => {
+    if (now - _trasladadosOverride[id] > OVERRIDE_TTL) delete _trasladadosOverride[id]; // ya caducó, el CSV ya debería traerlo bien
+  });
+  if (!Object.keys(_trasladadosOverride).length) return;
+  data.forEach(row => {
+    const id = String(row[cols.id]);
+    if (_trasladadosOverride[id] !== undefined) row[cols.comentario] = 'Trasladado';
+  });
+}
+
+async function marcarTrasladadoMov(ids) {
+  if (!APPS_SCRIPT_URL) {
+    console.warn('APPS_SCRIPT_URL no configurado: no se pudo marcar Trasladado en el Sheet.');
+    return;
+  }
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+      body: JSON.stringify({ token: UPLOAD_TOKEN, action: 'marcarTrasladado', ids })
+    });
+    const result = await resp.json();
+    if (!result.ok) {
+      alert('El archivo TRFMAS se descargó, pero no se pudo marcar "Trasladado" en el Sheet:\n' + (result.error || 'Error desconocido'));
+      return;
+    }
+  } catch (e) {
+    alert('El archivo TRFMAS se descargó, pero no se pudo conectar con el Sheet para marcar "Trasladado": ' + e.message);
+    return;
+  }
+
+  // Actualiza en memoria (dataMov y _vsData.mov) sin esperar al próximo refresco del CSV
+  const idSet = new Set(ids.map(String));
+  const colsMov = getMovColsCached(Object.keys(dataMov[0] || {}));
+  const now = Date.now();
+  [dataMov, _vsData.mov].forEach(arr => {
+    arr.forEach(row => {
+      if (idSet.has(String(row[colsMov.id]))) row[colsMov.comentario] = 'Trasladado';
+    });
+  });
+  idSet.forEach(id => { _trasladadosOverride[id] = now; });
+  buildSearchIndex('mov', dataMov);
+  refrescarVistaMov();
+}
+
+// Pre-indexar elementos por sección UNA sola vez (evita querySelectorAll repetido)
+const _secEls = {};
+function _initSecEls() {
+  document.querySelectorAll('[data-section]').forEach(el => {
+    el.getAttribute('data-section').trim().split(/\s+/).forEach(s => {
+      if (!_secEls[s]) _secEls[s] = [];
+      _secEls[s].push(el);
+    });
+  });
+}
+
+let _activeSection = null;
+
+function showSection(section) {
+  if (section === _activeSection) return;
+
+  // Construir índice la primera vez
+  if (!Object.keys(_secEls).length) _initSecEls();
+
+  const prev = _activeSection;
+  _activeSection = section;
+
+  // 1. body data-active (para los overrides CSS de grid)
+  document.body.setAttribute('data-active', section);
+
+  // 2. Nav links
+  document.querySelectorAll('nav a[data-nav]').forEach(l => {
+    const isActive = l.getAttribute('data-nav') === section;
+    l.classList.toggle('nav-active', isActive);
+  });
+
+  // 3. Mostrar/ocultar: solo toca los elementos que realmente cambian
+  //    Oculta los del grupo anterior, muestra los del nuevo
+  const allSections = Object.keys(_secEls);
+  allSections.forEach(s => {
+    const show = s === section;
+    _secEls[s].forEach(el => {
+      el.style.display = show ? '' : 'none';
+    });
+  });
+  // Los elementos que aparecen en MÚLTIPLES secciones (ej: "dashboard saldo")
+  // deben quedar visibles si la sección activa es cualquiera de las suyas
+  document.querySelectorAll('[data-section*=" "]').forEach(el => {
+    const secs = el.getAttribute('data-section').trim().split(/\s+/);
+    el.style.display = secs.includes(section) ? '' : 'none';
+  });
+
+  // 4. Título
+  const titles = {
+    dashboard:  { h: 'Resumen de Saldo (Stock)',              p: 'Estado actual de stock y movimientos logisticos.' },
+    saldo:      { h: 'Saldo de Inventario',                   p: 'Consulta y filtra el stock actual por producto, lote o ubicacion.' },
+    movimiento: { h: 'Movimientos',                           p: 'Historial de movimientos logisticos registrados.' },
+    bajas:      { h: 'Reporte de Bajas',                      p: 'Productos dados de baja del inventario.' },
+  };
+  const t = titles[section] || titles.dashboard;
+  const h2 = document.querySelector('h2.font-headline-lg');
+  const p  = h2 && h2.nextElementSibling;
+  if (h2) h2.textContent = t.h;
+  if (p)  p.textContent  = t.p;
+}
+
+// Inicializar en dashboard
+showSection('dashboard');
+
+
+// =============================================
+// REPORTE DE BAJAS
+// =============================================
+async function loadBajas(forceRefresh = true) {
+  const btn = document.getElementById('btn-bajas');
+  btn.innerHTML = '<span class="material-symbols-outlined spin text-[16px]">sync</span> Cargando...';
+  document.getElementById('tbody-bajas').innerHTML = '<tr class="loading-row"><td colspan="12"><span class="material-symbols-outlined spin" style="vertical-align:middle;margin-right:8px">sync</span>Conectando con Google Sheets...</td></tr>';
+
+  try {
+    const text = await fetchCSV(URL_BAJAS, forceRefresh);
+    const { headers, rows } = parseCSV(text);
+    dataBajas = toObjects(headers, rows);
+    buildSearchIndex('bajas', dataBajas);
+    refrescarVistaBajas();
+    document.getElementById('last-update-bajas').textContent = ts();
+  } catch(e) {
+    document.getElementById('tbody-bajas').innerHTML = '<tr class="error-row"><td colspan="12">Error al cargar: ' + e.message + '</td></tr>';
+  }
+  btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">refresh</span> Actualizar';
+}
+
+function getBajasCols(keys) {
+  return {
+    fecha:    detectCol(keys, [/^fecha/i, /date/i])           || keys[0],
+    codigo:   detectCol(keys, [/^cod/i, /sku/i, /item/i])     || keys[1],
+    desc:     detectCol(keys, [/desc/i, /nombre/i, /produc/i])|| keys[2],
+    ean:      detectCol(keys, [/ean/i, /barcode/i, /upc/i])   || keys[3],
+    lote:     detectCol(keys, [/^lote$/i, /lote.fis/i])       || keys[4],
+    expira:   detectCol(keys, [/expir/i, /venc/i])            || keys[5],
+    cantidad: detectCol(keys, [/cant/i, /qty/i, /amount/i])   || keys[6],
+    bodega:   detectCol(keys, [/bodega/i, /whs/i])            || keys[7],
+    origen:   detectCol(keys, [/origen/i, /from/i])           || keys[8],
+    destino:  detectCol(keys, [/destino/i, /to\b/i])          || keys[9],
+    estatus:  detectCol(keys, [/estatus/i, /status/i, /estado/i]) || keys[10],
+    usuario:  detectCol(keys, [/usuario/i, /user/i])          || keys[11],
+  };
+}
+
+function renderBajas(data, replace = true) {
+  const tbody = document.getElementById('tbody-bajas');
+  if (!data.length) {
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="12">Sin registros de bajas</td></tr>';
+    return;
+  }
+  const cols = getBajasColsCached(Object.keys(data[0]));
+  const frag = document.createDocumentFragment();
+  data.forEach(row => {
+    const days = daysToExpiry(row[cols.expira]);
+    const rowClass = days !== null && days < 0 ? 'text-error' : days !== null && days <= 30 ? 'text-amber-600' : '';
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-surface-container-low transition-colors ' + rowClass;
+    tr.innerHTML =
+        '<td class="px-3 py-2 text-center border border-outline-variant"><input type="checkbox" class="row-check w-4 h-4 accent-primary cursor-pointer"></td>'
+      + '<td class="px-3 py-2 font-label-data whitespace-nowrap border border-outline-variant">' + (row[cols.fecha]    || '—') + '</td>'
+      + '<td class="px-3 py-2 font-label-data border border-outline-variant">'                   + (row[cols.codigo]   || '—') + '</td>'
+      + '<td class="px-3 py-2 border border-outline-variant">'                                   + (row[cols.desc]     || '—') + '</td>'
+      + '<td class="px-3 py-2 font-label-data border border-outline-variant">'                   + (row[cols.ean]      || '—') + '</td>'
+      + '<td class="px-3 py-2 font-label-data border border-outline-variant">'                   + (row[cols.lote]     || '—') + '</td>'
+      + '<td class="px-3 py-2 font-label-data border border-outline-variant">'                   + (row[cols.expira]   || '—') + '</td>'
+      + '<td class="px-3 py-2 font-label-data font-bold text-right border border-outline-variant">' + (row[cols.cantidad] || '0') + '</td>'
+      + '<td class="px-3 py-2 font-label-data border border-outline-variant">'                   + (row[cols.bodega]   || '—') + '</td>'
+      + '<td class="px-3 py-2 font-label-data border border-outline-variant">'                   + (row[cols.origen]   || '—') + '</td>'
+      + '<td class="px-3 py-2 font-label-data border border-outline-variant">'                   + (row[cols.destino]  || '—') + '</td>'
+      + '<td class="px-3 py-2 text-center border border-outline-variant">'                       + (row[cols.estatus]  || '—') + '</td>'
+      + '<td class="px-3 py-2 border border-outline-variant">'                                   + (row[cols.usuario]  || '—') + '</td>';
+    frag.appendChild(tr);
+  });
+  if (replace) tbody.innerHTML = '';
+  tbody.appendChild(frag);
+}
+
+function filterBajas() {
+  if (!dataBajas.length) { alert('Los datos aun no han cargado. Presiona Actualizar primero.'); return; }
+  const q          = document.getElementById('search-bajas').value.trim().toLowerCase();
+  const destino    = document.getElementById('filter-destino-bajas').value.trim().toLowerCase();
+  const fechaDesde = document.getElementById('bajas-desde').value;
+  const fechaHasta = document.getElementById('bajas-hasta').value;
+  const cols       = getBajasColsCached(Object.keys(dataBajas[0]));
+  const colFecha   = cols.fecha;
+
+  const filtered = dataBajas.filter((r, i) => {
+    const coincideTexto   = !q       || _searchIndex.bajas[i].includes(q);
+    const coincideDestino = !destino || String(r[cols.destino] || '').toLowerCase().includes(destino);
+    let cumpleDesde = true, cumpleHasta = true;
+    if ((fechaDesde || fechaHasta) && colFecha) {
+      const fechaRaw = String(r[colFecha] || '').trim();
+      const partes = fechaRaw.split(' ')[0].split('/');
+      let fechaISO = '';
+      if (partes.length === 3 && partes[2].length === 4)
+        fechaISO = `${partes[2]}-${partes[1].padStart(2,'0')}-${partes[0].padStart(2,'0')}`;
+      else if (partes.length === 3 && partes[2].length === 2)
+        fechaISO = `20${partes[2]}-${partes[1].padStart(2,'0')}-${partes[0].padStart(2,'0')}`;
+      cumpleDesde = !fechaDesde || fechaISO >= fechaDesde;
+      cumpleHasta = !fechaHasta || fechaISO <= fechaHasta;
+    }
+    return coincideTexto && coincideDestino && cumpleDesde && cumpleHasta;
+  });
+  renderVirtual('bajas', filtered, renderBajas);
+}
+
+function clearFilterBajas() {
+  document.getElementById('search-bajas').value         = '';
+  document.getElementById('filter-destino-bajas').value = '';
+  document.getElementById('bajas-desde').value          = '';
+  document.getElementById('bajas-hasta').value          = '';
+  renderVirtual('bajas', dataBajas, renderBajas);
+}
+
+
+// =============================================
+// REAPLICAR FILTROS/BUSQUEDA VIGENTES TRAS CADA CARGA
+// (para que el auto-refresco no te resetee lo que estabas viendo)
+// =============================================
+function _valorActivo(id) {
+  const el = document.getElementById(id);
+  return !!(el && String(el.value || '').trim());
+}
+
+function refrescarVistaSaldo() {
+  const globalQ = (document.getElementById('global-search')?.value || '').trim();
+  if (globalQ) { debouncedGlobalSearch(globalQ); return; }
+  const activo = ['search-saldo','filter-whs-saldo','filter-codigo-saldo','filter-lote-saldo'].some(_valorActivo);
+  if (activo && dataSaldo.length) filterSaldo();
+  else renderVirtual('saldo', dataSaldo, renderSaldo);
+}
+
+function refrescarVistaAlertas() {
+  const activo = ['search-alertas','filter-whs-alertas'].some(_valorActivo);
+  if (activo && dataSaldo.length) filterAlertas();
+  else renderAlertas(dataSaldo);
+}
+
+function refrescarVistaMov() {
+  const globalQ = (document.getElementById('global-search')?.value || '').trim();
+  if (globalQ) { debouncedGlobalSearch(globalQ); return; }
+  const activo = ['search-mov','fecha-desde','fecha-hasta','filter-comentario-mov'].some(_valorActivo);
+  if (activo && dataMov.length) filterMov();
+  else renderVirtual('mov', dataMov, renderMov);
+}
+
+function refrescarVistaBajas() {
+  const activo = ['search-bajas','filter-destino-bajas','bajas-desde','bajas-hasta'].some(_valorActivo);
+  if (activo && dataBajas.length) filterBajas();
+  else renderVirtual('bajas', dataBajas, renderBajas);
+}
+
+// Carga progresiva: saldo primero (tab activo), luego mov y bajas en background
+let _lastAutoRefresh = Date.now();
+async function cargarTodo(forceRefresh = false) {
+  // Saldo es lo primero que el usuario ve — cargarlo antes
+  await loadSaldo(forceRefresh);
+  // Mov y Bajas en paralelo, pero sin bloquear el UI
+  Promise.allSettled([
+    loadMov(forceRefresh),
+    loadBajas(forceRefresh)
+  ]);
+  _lastAutoRefresh = Date.now();
+}
+// Solo auto-refresh si la pestaña está activa (evita refreshes innecesarios)
+function autoRefresh() {
+  if (!document.hidden) cargarTodo(true);
+}
+cargarTodo(false); // primera carga: usa caché si hay
+setInterval(autoRefresh, 600000); // auto-refresco inteligente: solo si pestaña activa
+
+// Si estuviste con la pestaña oculta/minimizada y ya pasaron 10+ min desde el
+// último refresco, al volver a la pestaña se refresca de inmediato en vez de
+// esperar al próximo "tick" del setInterval (que el navegador puede pausar
+// mientras la pestaña está en segundo plano).
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - _lastAutoRefresh >= 600000) {
+    autoRefresh();
+  }
+});
+
+// =============================================
+// MODAL CAMPANILLA Y USUARIO
+// =============================================
+function mostrarAlertas() {
+  const alertas = document.querySelectorAll('#tbody-alertas tr:not(.loading-row):not(.error-row)');
+  const count = alertas.length;
+  const msg = count > 0
+    ? `<span style="color:#ba1a1a;font-size:28px;font-weight:700">${count}</span><br><span style="font-size:13px;color:#3a5244">producto${count !== 1 ? 's' : ''} con alerta de vencimiento activa</span><br><br><span style="font-size:12px;color:#6a9478">Ir a <b>Alertas Críticas</b> para ver el detalle.</span>`
+    : `<span style="color:#1a7a42;font-size:28px;font-weight:700">✓</span><br><span style="font-size:13px;color:#3a5244">Sin alertas críticas activas</span>`;
+  mostrarModal('🔔 Alertas de Vencimiento', msg);
+}
+
+function mostrarInfoApp() {
+  const msg = `<div style="text-align:center;padding:8px 0">
+    <div style="font-size:40px;margin-bottom:8px">👷</div>
+    <div style="font-size:18px;font-weight:700;color:#0f6b35;margin-bottom:4px">Creado por Omar Bernales</div>
+    <div style="font-size:12px;color:#6a9478;margin-bottom:16px">Odan89</div>
+    <div style="font-size:12px;color:#3a5244;background:#eaf3ed;border-radius:8px;padding:10px 14px;text-align:left;line-height:1.8">
+      📦 <b>Sistema:</b> Salon Logic WMS<br>
+      🔗 <b>Fuente:</b> Google Sheets en tiempo real<br>
+      ⏱ <b>Refresco:</b> Automático cada 5 min<br>
+      📁 <b>Archivo:</b> Unidireccional (solo lectura)
+    </div>
+  </div>`;
+  mostrarModal('ℹ️ Información del Sistema', msg);
+}
+
+function mostrarModal(titulo, contenido) {
+  document.getElementById('wms-modal-title').innerHTML = titulo;
+  document.getElementById('wms-modal-body').innerHTML = contenido;
+  document.getElementById('wms-modal').classList.remove('hidden');
+}
+
+function cerrarModal() {
+  document.getElementById('wms-modal').classList.add('hidden');
+}
+
+</script>
+<!-- Modal general -->
+<div id="wms-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center">
+  <div onclick="cerrarModal()" class="absolute inset-0 bg-black/40"></div>
+  <div class="relative bg-surface rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 border border-outline-variant">
+    <div class="flex justify-between items-center mb-4">
+      <h3 id="wms-modal-title" class="font-headline-md text-[16px] font-bold text-primary"></h3>
+      <button onclick="cerrarModal()" class="text-on-surface-variant hover:text-primary transition-colors">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div id="wms-modal-body" class="text-center text-on-surface"></div>
+    <button onclick="cerrarModal()" class="mt-5 w-full py-2 bg-primary text-white font-bold rounded-lg text-[13px] hover:opacity-90 transition-colors">Cerrar</button>
+  </div>
+</div>
+
+</body>
+</html>
