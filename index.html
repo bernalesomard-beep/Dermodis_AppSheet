@@ -123,6 +123,16 @@
     white-space: normal;
     word-break: break-word;
   }
+  /* ── Reporte de Bajas: todas las celdas en una sola linea, con scroll horizontal si el contenido no cabe ── */
+  #bajas-scroll-inner table td,
+  #bajas-scroll-inner table th {
+    white-space: nowrap !important;
+  }
+  #bajas-scroll-inner table td {
+    font-size: 12px !important;
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+  }
 
   /* ── Aspecto más ejecutivo: bordes y sombras más sobrios, cabeceras con mejor contraste ── */
   .bg-surface-container-lowest.rounded-lg.border {
@@ -589,8 +599,8 @@
           </button>
         </div>
       </div>
-      <div id="bajas-scroll-inner" class="overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar" style="will-change:transform">
-        <table class="w-full border-collapse border border-outline-variant">
+      <div id="bajas-scroll-inner" class="overflow-y-auto overflow-x-auto max-h-[calc(100vh-280px)] custom-scrollbar" style="will-change:transform">
+        <table class="w-full border-collapse border border-outline-variant" style="min-width:1400px">
           <thead>
             <tr class="bg-primary text-white">
               <th class="font-table-header text-table-header px-3 py-2 text-center border border-outline-variant w-8"><input type="checkbox" id="chk-all-bajas" onchange="toggleAllCheck('tbody-bajas',this.checked)" class="w-4 h-4 accent-white cursor-pointer"></th>
