@@ -580,9 +580,15 @@
           <button onclick="exportCSV('bajas')" class="flex items-center gap-1 px-3 py-1 bg-surface border border-secondary text-secondary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors">
             <span class="material-symbols-outlined text-[16px]">download</span><span>Exportar</span>
           </button>
+          <button onclick="descargarReporteBajas()" class="flex items-center gap-1 px-3 py-1 bg-surface border border-primary text-primary font-bold rounded text-[12px] hover:bg-surface-container-high transition-colors whitespace-nowrap">
+            <span class="material-symbols-outlined text-[16px]">description</span><span>Descargar Reporte</span>
+          </button>
           <div class="relative flex items-center">
-            <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">place</span>
-            <input id="filter-destino-bajas" oninput="debouncedFilterBajas()" onkeydown="if(event.key==='Enter')filterBajas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-32" placeholder="Ubic. Destino...">
+            <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant pointer-events-none z-10">place</span>
+            <select id="filter-destino-bajas" onchange="filterBajas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-6 py-1.5 focus:ring-1 focus:ring-primary outline-none w-36 cursor-pointer">
+              <option value="">Todas las ubic.</option>
+            </select>
+            <span class="material-symbols-outlined absolute right-1 text-[16px] text-on-surface-variant pointer-events-none">arrow_drop_down</span>
           </div>
           <div class="relative flex items-center">
             <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">search</span>
@@ -1654,6 +1660,78 @@ function exportMovTRFMAS() {
 }
 
 // =============================================
+// DESCARGAR REPORTE DE BAJAS (formato fijo: FECHA, CODIGO, DESCRIPCION,
+// EAN13, LOTE, EXPIRA, CANTIDAD, ESTATUS) con cabecera azul y bordes
+// =============================================
+function descargarReporteBajas() {
+  const source = (_vsData.bajas && _vsData.bajas.length) ? _vsData.bajas : dataBajas;
+  if (!source.length) { alert('No hay datos de bajas para descargar. Presiona Actualizar primero.'); return; }
+
+  const cols = getBajasColsCached(Object.keys(source[0]));
+  const headers = ['FECHA', 'CODIGO', 'DESCRIPCION', 'EAN13', 'LOTE', 'EXPIRA', 'CANTIDAD', 'ESTATUS'];
+  const keyMap  = [cols.fecha, cols.codigo, cols.desc, cols.ean, cols.lote, cols.expira, cols.cantidad, cols.estatus];
+
+  const bordeFino = {
+    top:    { style: 'thin', color: { rgb: '000000' } },
+    bottom: { style: 'thin', color: { rgb: '000000' } },
+    left:   { style: 'thin', color: { rgb: '000000' } },
+    right:  { style: 'thin', color: { rgb: '000000' } }
+  };
+
+  const ws = {};
+
+  // Cabecera
+  headers.forEach((h, C) => {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+    ws[addr] = {
+      t: 's', v: h,
+      s: {
+        font:      { bold: true, color: { rgb: 'FFFFFF' } },
+        fill:      { fgColor: { rgb: '4472C4' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border:    bordeFino
+      }
+    };
+  });
+
+  // Filas de datos
+  source.forEach((row, rowIdx) => {
+    keyMap.forEach((key, C) => {
+      const addr = XLSX.utils.encode_cell({ r: rowIdx + 1, c: C });
+      const raw  = row[key] !== undefined ? row[key] : '';
+      const esCantidad = headers[C] === 'CANTIDAD';
+      let cell;
+      if (esCantidad && raw !== '' && !isNaN(String(raw).replace(',', '.'))) {
+        cell = { t: 'n', v: parseFloat(String(raw).replace(',', '.')) };
+      } else {
+        cell = { t: 's', v: String(raw) };
+      }
+      cell.s = {
+        alignment: { horizontal: esCantidad ? 'center' : 'left', vertical: 'center' },
+        border:    bordeFino
+      };
+      ws[addr] = cell;
+    });
+  });
+
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: source.length, c: headers.length - 1 } });
+
+  // Ancho de columnas automático
+  ws['!cols'] = headers.map((h, C) => {
+    let maxLen = h.length;
+    source.forEach(row => { const len = String(row[keyMap[C]] || '').length; if (len > maxLen) maxLen = len; });
+    return { wch: Math.min(maxLen + 2, 45) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+
+  const hoy = new Date();
+  const fechaStr = String(hoy.getDate()).padStart(2, '0') + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + hoy.getFullYear();
+  XLSX.writeFile(wb, `Reporte bajas ${fechaStr}.xlsx`);
+}
+
+// =============================================
 // MARCAR COMO "Trasladado" LA COLUMNA COMENTARIO EN EL SHEET
 // =============================================
 // El CSV publicado del Sheet tarda 1-2 min en reflejar cambios escritos vía
@@ -1787,6 +1865,7 @@ async function loadBajas(forceRefresh = true) {
     const { headers, rows } = parseCSV(text);
     dataBajas = toObjects(headers, rows);
     buildSearchIndex('bajas', dataBajas);
+    poblarDestinoBajas(dataBajas);
     refrescarVistaBajas();
     document.getElementById('last-update-bajas').textContent = ts();
   } catch(e) {
@@ -1848,7 +1927,7 @@ function renderBajas(data, replace = true) {
 function filterBajas() {
   if (!dataBajas.length) { alert('Los datos aun no han cargado. Presiona Actualizar primero.'); return; }
   const q          = document.getElementById('search-bajas').value.trim().toLowerCase();
-  const destino    = document.getElementById('filter-destino-bajas').value.trim().toLowerCase();
+  const destino    = document.getElementById('filter-destino-bajas').value.trim().toUpperCase();
   const fechaDesde = document.getElementById('bajas-desde').value;
   const fechaHasta = document.getElementById('bajas-hasta').value;
   const cols       = getBajasColsCached(Object.keys(dataBajas[0]));
@@ -1856,7 +1935,7 @@ function filterBajas() {
 
   const filtered = dataBajas.filter((r, i) => {
     const coincideTexto   = !q       || _searchIndex.bajas[i].includes(q);
-    const coincideDestino = !destino || String(r[cols.destino] || '').toLowerCase().includes(destino);
+    const coincideDestino = !destino || String(r[cols.destino] || '').trim().toUpperCase().slice(0, 2) === destino;
     let cumpleDesde = true, cumpleHasta = true;
     if ((fechaDesde || fechaHasta) && colFecha) {
       const fechaRaw = String(r[colFecha] || '').trim();
@@ -1880,6 +1959,23 @@ function clearFilterBajas() {
   document.getElementById('bajas-desde').value          = '';
   document.getElementById('bajas-hasta').value          = '';
   renderVirtual('bajas', dataBajas, renderBajas);
+}
+
+// Llena el select "Ubic. Destino" con los prefijos de 2 digitos hallados en los datos
+function poblarDestinoBajas(data) {
+  const sel = document.getElementById('filter-destino-bajas');
+  if (!sel || !data.length) return;
+  const cols = getBajasColsCached(Object.keys(data[0]));
+  const valorActual = sel.value;
+  const prefijos = new Set();
+  data.forEach(r => {
+    const v = String(r[cols.destino] || '').trim().toUpperCase().slice(0, 2);
+    if (v) prefijos.add(v);
+  });
+  const ordenados = Array.from(prefijos).sort();
+  sel.innerHTML = '<option value="">Todas las ubic.</option>' +
+    ordenados.map(p => '<option value="' + p + '">' + p + '</option>').join('');
+  if (ordenados.includes(valorActual)) sel.value = valorActual;
 }
 
 
