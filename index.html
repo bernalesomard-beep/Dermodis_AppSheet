@@ -588,12 +588,21 @@
             <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">place</span>
             <input id="filter-destino-bajas" oninput="debouncedFilterBajas()" onkeydown="if(event.key==='Enter')filterBajas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-2 py-1 focus:ring-1 focus:ring-primary outline-none w-32" placeholder="Ubic. Destino...">
           </div>
-          <div class="relative flex items-center">
-            <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant pointer-events-none z-10">filter_alt</span>
-            <select id="filter-destino-prefijo-bajas" onchange="filterBajas()" class="bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-7 pr-6 py-1.5 focus:ring-1 focus:ring-primary outline-none w-32 cursor-pointer">
-              <option value="">Todas (2 díg.)</option>
-            </select>
-            <span class="material-symbols-outlined absolute right-1 text-[16px] text-on-surface-variant pointer-events-none">arrow_drop_down</span>
+          <div class="relative" id="destino-multiselect-wrap">
+            <button type="button" onclick="toggleDestinoMultiselect(event)" id="destino-multiselect-btn" class="flex items-center justify-between gap-1 bg-surface-container-low border border-outline text-on-surface font-label-data text-[12px] rounded-lg pl-2 pr-1 py-1.5 focus:ring-1 focus:ring-primary outline-none w-36 cursor-pointer">
+              <span class="flex items-center gap-1 truncate">
+                <span class="material-symbols-outlined text-[16px] shrink-0">filter_alt</span>
+                <span id="destino-multiselect-label" class="truncate">Todas (2 díg.)</span>
+              </span>
+              <span class="material-symbols-outlined text-[16px] shrink-0">arrow_drop_down</span>
+            </button>
+            <div id="destino-multiselect-panel" class="hidden absolute z-30 mt-1 w-44 max-h-60 overflow-y-auto bg-surface-container-low border border-outline rounded-lg shadow-lg py-1">
+              <div class="flex items-center justify-between px-2 py-1 border-b border-outline-variant mb-1">
+                <button type="button" onclick="_setTodosDestinoPrefijo(true)" class="text-[11px] text-primary font-bold hover:underline">Todos</button>
+                <button type="button" onclick="_setTodosDestinoPrefijo(false)" class="text-[11px] text-on-surface-variant hover:underline">Ninguno</button>
+              </div>
+              <div id="destino-multiselect-options"></div>
+            </div>
           </div>
           <div class="relative flex items-center">
             <span class="material-symbols-outlined absolute left-2 text-[16px] text-on-surface-variant">search</span>
@@ -1677,6 +1686,10 @@ async function descargarReporteBajas() {
   const headers = ['FECHA', 'CODIGO', 'DESCRIPCION', 'EAN13', 'LOTE', 'EXPIRA', 'CANTIDAD', 'ESTATUS'];
   const keyMap  = [cols.fecha, cols.codigo, cols.desc, cols.ean, cols.lote, cols.expira, cols.cantidad, cols.estatus];
 
+  const source_ordenado = [...source].sort((a, b) =>
+    String(a[cols.estatus] || '').localeCompare(String(b[cols.estatus] || ''), 'es', { sensitivity: 'base' })
+  );
+
   const bordeFino = {
     top:    { style: 'thin', color: { argb: 'FF000000' } },
     bottom: { style: 'thin', color: { argb: 'FF000000' } },
@@ -1696,7 +1709,7 @@ async function descargarReporteBajas() {
     cell.border    = bordeFino;
   });
 
-  source.forEach(row => {
+  source_ordenado.forEach(row => {
     const values = keyMap.map((key, i) => {
       const raw = row[key] !== undefined ? row[key] : '';
       if (headers[i] === 'CANTIDAD' && raw !== '' && !isNaN(String(raw).replace(',', '.'))) {
@@ -1929,7 +1942,6 @@ function filterBajas() {
   if (!dataBajas.length) { alert('Los datos aun no han cargado. Presiona Actualizar primero.'); return; }
   const q          = document.getElementById('search-bajas').value.trim().toLowerCase();
   const destino    = document.getElementById('filter-destino-bajas').value.trim().toLowerCase();
-  const prefijo    = document.getElementById('filter-destino-prefijo-bajas').value.trim().toUpperCase();
   const fechaDesde = document.getElementById('bajas-desde').value;
   const fechaHasta = document.getElementById('bajas-hasta').value;
   const cols       = getBajasColsCached(Object.keys(dataBajas[0]));
@@ -1938,7 +1950,7 @@ function filterBajas() {
   const filtered = dataBajas.filter((r, i) => {
     const coincideTexto   = !q       || _searchIndex.bajas[i].includes(q);
     const coincideDestino = !destino || String(r[cols.destino] || '').toLowerCase().includes(destino);
-    const coincidePrefijo = !prefijo || String(r[cols.destino] || '').trim().toUpperCase().slice(0, 2) === prefijo;
+    const coincidePrefijo = destinoPrefijosSeleccionados.size === 0 || destinoPrefijosSeleccionados.has(String(r[cols.destino] || '').trim().toUpperCase().slice(0, 2));
     let cumpleDesde = true, cumpleHasta = true;
     if ((fechaDesde || fechaHasta) && colFecha) {
       const fechaRaw = String(r[colFecha] || '').trim();
@@ -1957,30 +1969,85 @@ function filterBajas() {
 }
 
 function clearFilterBajas() {
-  document.getElementById('search-bajas').value                 = '';
-  document.getElementById('filter-destino-bajas').value         = '';
-  document.getElementById('filter-destino-prefijo-bajas').value = '';
-  document.getElementById('bajas-desde').value                  = '';
-  document.getElementById('bajas-hasta').value                  = '';
+  document.getElementById('search-bajas').value         = '';
+  document.getElementById('filter-destino-bajas').value = '';
+  document.getElementById('bajas-desde').value           = '';
+  document.getElementById('bajas-hasta').value            = '';
+  destinoPrefijosSeleccionados.clear();
+  _renderDestinoMultiselectLabel();
+  document.querySelectorAll('#destino-multiselect-options input[type=checkbox]').forEach(cb => cb.checked = false);
+  cerrarDestinoMultiselect();
   renderVirtual('bajas', dataBajas, renderBajas);
 }
 
-// Llena el select de prefijo (2 digitos) con las ubicaciones destino halladas en los datos
+// Estado de la seleccion multiple del filtro "Ubic. Destino" (2 digitos)
+let destinoPrefijosSeleccionados = new Set();
+
+// Llena el panel de checkboxes con los prefijos de 2 digitos hallados en los datos
 function poblarDestinoBajas(data) {
-  const sel = document.getElementById('filter-destino-prefijo-bajas');
-  if (!sel || !data.length) return;
+  const cont = document.getElementById('destino-multiselect-options');
+  if (!cont || !data.length) return;
   const cols = getBajasColsCached(Object.keys(data[0]));
-  const valorActual = sel.value;
   const prefijos = new Set();
   data.forEach(r => {
     const v = String(r[cols.destino] || '').trim().toUpperCase().slice(0, 2);
     if (v) prefijos.add(v);
   });
   const ordenados = Array.from(prefijos).sort();
-  sel.innerHTML = '<option value="">Todas (2 díg.)</option>' +
-    ordenados.map(p => '<option value="' + p + '">' + p + '</option>').join('');
-  if (ordenados.includes(valorActual)) sel.value = valorActual;
+  // Conserva la seleccion previa, descartando prefijos que ya no existan
+  destinoPrefijosSeleccionados = new Set(Array.from(destinoPrefijosSeleccionados).filter(p => prefijos.has(p)));
+
+  cont.innerHTML = ordenados.map(p =>
+    `<label class="flex items-center gap-2 px-2 py-1 text-[12px] text-on-surface hover:bg-surface-container-high cursor-pointer">
+       <input type="checkbox" value="${p}" onchange="_toggleDestinoPrefijo('${p}', this.checked)" ${destinoPrefijosSeleccionados.has(p) ? 'checked' : ''} class="rounded border-outline text-primary focus:ring-primary">
+       <span>${p}</span>
+     </label>`
+  ).join('');
+
+  _renderDestinoMultiselectLabel();
 }
+
+function _toggleDestinoPrefijo(prefijo, marcado) {
+  if (marcado) destinoPrefijosSeleccionados.add(prefijo);
+  else destinoPrefijosSeleccionados.delete(prefijo);
+  _renderDestinoMultiselectLabel();
+  filterBajas();
+}
+
+function _setTodosDestinoPrefijo(marcarTodos) {
+  const checks = document.querySelectorAll('#destino-multiselect-options input[type=checkbox]');
+  destinoPrefijosSeleccionados.clear();
+  checks.forEach(cb => {
+    cb.checked = marcarTodos;
+    if (marcarTodos) destinoPrefijosSeleccionados.add(cb.value);
+  });
+  _renderDestinoMultiselectLabel();
+  filterBajas();
+}
+
+function _renderDestinoMultiselectLabel() {
+  const label = document.getElementById('destino-multiselect-label');
+  if (!label) return;
+  const n = destinoPrefijosSeleccionados.size;
+  if (n === 0) label.textContent = 'Todas (2 díg.)';
+  else if (n === 1) label.textContent = Array.from(destinoPrefijosSeleccionados)[0];
+  else label.textContent = n + ' seleccionadas';
+}
+
+function toggleDestinoMultiselect(ev) {
+  if (ev) ev.stopPropagation();
+  const panel = document.getElementById('destino-multiselect-panel');
+  panel.classList.toggle('hidden');
+}
+
+function cerrarDestinoMultiselect() {
+  document.getElementById('destino-multiselect-panel')?.classList.add('hidden');
+}
+
+document.addEventListener('click', (ev) => {
+  const wrap = document.getElementById('destino-multiselect-wrap');
+  if (wrap && !wrap.contains(ev.target)) cerrarDestinoMultiselect();
+});
 
 
 // =============================================
@@ -2015,7 +2082,7 @@ function refrescarVistaMov() {
 }
 
 function refrescarVistaBajas() {
-  const activo = ['search-bajas','filter-destino-bajas','filter-destino-prefijo-bajas','bajas-desde','bajas-hasta'].some(_valorActivo);
+  const activo = ['search-bajas','filter-destino-bajas','bajas-desde','bajas-hasta'].some(_valorActivo) || destinoPrefijosSeleccionados.size > 0;
   if (activo && dataBajas.length) filterBajas();
   else renderVirtual('bajas', dataBajas, renderBajas);
 }
